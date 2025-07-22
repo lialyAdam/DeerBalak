@@ -1,0 +1,60 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - DeerBalakAlena </title>
+   @*  <link rel="icon" type="image/x-icon" href="@Url.Content("~/favicon.ico")" />
+    <link rel="shortcut icon" href="@Url.Content("~/favicon.ico")" type="image/x-icon" /> *@
+    <link rel="icon" type="image/png" href="~/images/WhiteLogo.png" />
+@*     <link rel="shortcut icon" href="~/images/WhiteLogo.png" type="image/png" />
+ *@
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/style.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tailwind.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/DeerBalak.styles.css" asp-append-version="true" />
+</head>
+<body>
+    <div id="wrapper">
+
+
+        @if (User.Identity.IsAuthenticated)
+        {
+            @if (User.IsInRole(AppRoles.User))
+            {
+                <partial name="Navigation/_TopBar" />
+                <partial name="Navigation/_SideBar" />
+            }
+            else if (User.IsInRole(AppRoles.Admin))
+            {
+                <partial name="Navigation/_TopBarAdmin" />
+            }
+        }
+
+        @RenderBody()
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    @* //Asset scripts *@
+    <script src="~/js/uikit.min.js"></script>
+    <script src="~/js/simplebar.js"></script>
+    <script src="~/js/script.js"></script>
+
+
+   @* Ion Icon *@
+   
+
+    @await RenderSectionAsync("Scripts", required: false)
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+
+
+
+
+
+
+</body>
+</html>
