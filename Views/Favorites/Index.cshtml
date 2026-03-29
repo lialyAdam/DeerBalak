@@ -28,7 +28,8 @@
                      @await Component.InvokeAsync("SuggestedFriends") 
                 </div>
                 <div class="box p-5 px-6 border1">
-                    @await Component.InvokeAsync("Hashtags")
+                    @* Hashtags temporarily disabled to avoid DB errors. *@
+                    <div class="text-sm text-gray-500">Hashtags are temporarily disabled.</div>
                 </div>
             </div>
         </div>

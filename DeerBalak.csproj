@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Deerbalak.ViewComponents\" />
     <Folder Include="Migrations\" />
     <Folder Include="Views\Shared\Sidebar\" />
     <Folder Include="wwwroot\images\profilePictures\" />
@@ -29,6 +30,8 @@
     <Folder Include="wwwroot\images\stories\" />
     <Folder Include="wwwroot\images\stories\" />
     <Folder Include="wwwroot\images\uploaded\" />
+    <Folder Include="wwwroot\uploads\" />
+    <Folder Include="wwwroot\NewFolder\" />
   </ItemGroup>
 
   <ItemGroup>
