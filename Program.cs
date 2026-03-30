@@ -27,6 +27,12 @@ builder.Services.AddScoped<IPostsService, PostsService>();
 builder.Services.AddScoped<IHashtagsService, HashtagsService>();
 builder.Services.AddScoped<IStoriesService, StoriesService>();
 
+// Fake news detection support
+builder.Services.AddSingleton<FakeNewsService>();
+builder.Services.AddSingleton<TextProcessor>();
+builder.Services.AddSingleton<SimilarityService>();
+builder.Services.AddSingleton<HybridDetector>();
+
 // ✅ Fallback to LocalFilesService if blob connection string is missing or placeholder
 if (!string.IsNullOrWhiteSpace(blobConnectionString) && !blobConnectionString.Contains("xxx"))
 {

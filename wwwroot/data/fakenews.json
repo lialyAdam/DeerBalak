@@ -1,0 +1,47 @@
+[
+  { "text": "Please be cautious, there is heavy traffic on a main road", "label": "Real" },
+  { "text": "A temporary road closure has been announced due to maintenance", "label": "Real" },
+  { "text": "Authorities advise avoiding crowded areas today", "label": "Real" },
+  { "text": "There is congestion in some streets during peak hours", "label": "Real" },
+  { "text": "Please follow updates from official channels", "label": "Real" },
+  { "text": "People are advised to stay alert in busy areas", "label": "Real" },
+  { "text": "A public notice mentioned delays on several roads", "label": "Real" },
+  { "text": "Stay cautious when traveling through crowded places", "label": "Real" },
+  { "text": "There may be traffic delays this evening", "label": "Real" },
+  { "text": "An official update reported a minor road issue", "label": "Real" },
+
+  { "text": "I heard there might be an issue in one area, not confirmed", "label": "Unverified" },
+  { "text": "Someone said a road could be closed but no confirmation yet", "label": "Unverified" },
+  { "text": "There are reports about unusual activity, but details are unclear", "label": "Unverified" },
+  { "text": "It is being said that something might happen today", "label": "Unverified" },
+  { "text": "Unconfirmed information about a possible road closure", "label": "Unverified" },
+  { "text": "Rumors are spreading about a situation in a certain area", "label": "Unverified" },
+  { "text": "There may be a problem in one location, but not verified", "label": "Unverified" },
+  { "text": "Some people are talking about a possible issue, unclear source", "label": "Unverified" },
+  { "text": "Information received but no official confirmation", "label": "Unverified" },
+  { "text": "There is talk about delays but nothing confirmed yet", "label": "Unverified" },
+
+  { "text": "Share immediately, all roads are closed and everyone is in danger", "label": "Fake" },
+  { "text": "Urgent! The entire city is unsafe right now", "label": "Fake" },
+  { "text": "Disaster! Everything is closed and people are at risk", "label": "Fake" },
+  { "text": "Share now before it gets deleted, major danger everywhere", "label": "Fake" },
+  { "text": "Everyone must leave immediately, extreme danger", "label": "Fake" },
+  { "text": "Breaking: all areas are completely unsafe", "label": "Fake" },
+  { "text": "Share this quickly, something very dangerous is happening", "label": "Fake" },
+  { "text": "Huge disaster happening right now across all areas", "label": "Fake" },
+  { "text": "Everything is blocked, no one is safe", "label": "Fake" },
+  { "text": "Massive danger across the entire region, act now", "label": "Fake" },
+
+  { "text": "Please verify news before sharing it with others", "label": "Real" },
+  { "text": "Always rely on trusted sources for updates", "label": "Real" },
+  { "text": "Be careful and double-check information", "label": "Real" },
+  { "text": "Stay informed through official announcements", "label": "Real" },
+  { "text": "Avoid spreading unverified information", "label": "Real" },
+
+  { "text": "It might be unsafe in one area, still checking", "label": "Unverified" },
+  { "text": "Possible issue reported but no details yet", "label": "Unverified" },
+  { "text": "Unclear reports about road conditions", "label": "Unverified" },
+
+  { "text": "Urgent share this with everyone you know now", "label": "Fake" },
+  { "text": "Everyone is in danger right now act fast", "label": "Fake" }
+]

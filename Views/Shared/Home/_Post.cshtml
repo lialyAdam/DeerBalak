@@ -21,6 +21,10 @@
 
     bool showAllComments = ViewData["ShowAllComment"] as bool? ?? false;
     bool showDetails = ViewData["ShowDetails"] as bool? ?? true;
+
+    var postLabel = string.IsNullOrWhiteSpace(Model.FakeNewsLabel)
+        ? "Verified"
+        : Model.FakeNewsLabel;
 }
 
 <div id="post-@Model.Id" class="bg-white rounded-xl shadow-sm text-sm font-medium border1">
@@ -37,6 +41,42 @@
                 <h4 class="text-black">@Model.User.FullName</h4>
                 <div class="text-xs text-gray-500/80" title="@Model.DateCreated.ToString("MM/dd/yyyy HH:mm")"> @displayTime </div>
             </a>
+
+            <div class="mt-1">
+                @if (postLabel == "Needs Verification")
+                {
+                    <span class="uppercase text-xs font-bold px-2 py-1 rounded-lg bg-red-100 text-red-700">Needs Verification</span>
+                }
+                else if (postLabel == "Unverified")
+                {
+                    <span class="uppercase text-xs font-bold px-2 py-1 rounded-lg bg-yellow-100 text-yellow-800">Unverified</span>
+                }
+                else
+                {
+                    <span class="uppercase text-xs font-bold px-2 py-1 rounded-lg bg-green-100 text-green-700">Verified</span>
+                }
+            </div>
+
+            <div class="mt-1 text-xs">
+                <span class="font-semibold">Confidence Score:</span> @Model.FakeNewsScore
+                <span class="ml-2 text-muted">(@postLabel)</span>
+            </div>
+            <div class="text-xs text-gray-700">
+                <span class="font-semibold">Similarity:</span> @(Math.Round(Model.FakeNewsSimilarity * 100, 0))%
+            </div>
+
+            @if (Model.FakeNewsReasons != null && Model.FakeNewsReasons.Any())
+            {
+                <div class="mt-1 text-xs text-gray-600">
+                    <div class="font-semibold">Reason:</div>
+                    <ul class="list-disc list-inside">
+                        @foreach (var reason in Model.FakeNewsReasons)
+                        {
+                            <li>@reason</li>
+                        }
+                    </ul>
+                </div>
+            }
         </div>
 
         <div class="-mr-1">
