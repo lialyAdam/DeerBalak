@@ -14,11 +14,14 @@ namespace Deerbalak.Controllers
     {
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
+        private readonly RoleManager<IdentityRole<int>> _roleManager;
         public AuthenticationController(UserManager<User> userManager,
-            SignInManager<User> signInManager)
+            SignInManager<User> signInManager,
+            RoleManager<IdentityRole<int>> roleManager)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _roleManager = roleManager;
         }
 
         //public async Task<IActionResult> Login()
@@ -48,17 +51,19 @@ namespace Deerbalak.Controllers
                 await _userManager.AddClaimAsync(existingUser, new Claim(CustomClaim.FullName, existingUser.FullName));
 
             var result = await _signInManager.PasswordSignInAsync(existingUser.UserName, loginVM.Password, false, false);
-
-            if (result.Succeeded)
+            if (!result.Succeeded)
             {
-                if (User.IsInRole(AppRoles.Admin))
-                    return RedirectToAction("Index", "Admin");
-                else
-                    return RedirectToAction("Index", "Home");
+                ModelState.AddModelError("", "Invalid email or password. Please, try again");
+                return View(loginVM);
             }
 
-            ModelState.AddModelError("", "Invalid login attempt");
-            return View(loginVM);
+            var userRoles = await _userManager.GetRolesAsync(existingUser);
+            await _signInManager.RefreshSignInAsync(existingUser);
+
+            if (userRoles.Contains(AppRoles.Admin))
+                return RedirectToAction("Index", "Admin");
+
+            return RedirectToAction("Index", "Home");
         }
 
         //public async Task<IActionResult> Register()
@@ -94,6 +99,12 @@ namespace Deerbalak.Controllers
 
             if (result.Succeeded)
             {
+                // Ensure role exists before assigning
+                if (!await _roleManager.RoleExistsAsync(AppRoles.User))
+                {
+                    await _roleManager.CreateAsync(new IdentityRole<int>(AppRoles.User));
+                }
+
                 await _userManager.AddToRoleAsync(newUser, AppRoles.User);
                 await _userManager.AddClaimAsync(newUser, new Claim(CustomClaim.FullName, newUser.FullName));
                 await _signInManager.SignInAsync(newUser, isPersistent: false);
@@ -106,6 +117,11 @@ namespace Deerbalak.Controllers
             }
 
             return View(registerVM);
+        }
+
+        public IActionResult AccessDenied()
+        {
+            return View();
         }
 
         [HttpPost]

@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace DeerBalak.Controllers
 {
-    [Authorize(Roles = AppRoles.User)]
+    [Authorize(Roles = "User,Admin")]
     public class HomeController : BaseController
     {
         private readonly ILogger<HomeController> _logger;
