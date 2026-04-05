@@ -1,0 +1,208 @@
+@model Dictionary<string, object>
+@{
+    ViewData["Title"] = "Dashboard";
+
+    // Helper functions for risk level colors
+    string GetRiskColor(string riskLevel) => riskLevel switch
+    {
+        "CRITICAL" => "#fee2e2", // red-100
+        "HIGH" => "#fed7aa",     // orange-100
+        "MEDIUM" => "#fef3c7",   // yellow-100
+        "LOW" => "#dbeafe",      // blue-100
+        _ => "#f0fdf4"           // green-100
+    };
+
+    string GetRiskTextColor(string riskLevel) => riskLevel switch
+    {
+        "CRITICAL" => "#dc2626", // red-600
+        "HIGH" => "#ea580c",     // orange-600
+        "MEDIUM" => "#ca8a04",   // yellow-600
+        "LOW" => "#2563eb",      // blue-600
+        _ => "#16a34a"           // green-600
+    };
+
+    int GetCount(string key)
+    {
+        if (Model.TryGetValue(key, out var value) && value is int intValue)
+            return intValue;
+
+        var altKey = key.Replace(" ", "");
+        if (Model.TryGetValue(altKey, out var altValue) && altValue is int altInt)
+            return altInt;
+
+        var suffixedKey = key.Replace(" ", "") + "Posts";
+        if (Model.TryGetValue(suffixedKey, out var suffixedValue) && suffixedValue is int suffixedInt)
+            return suffixedInt;
+
+        return 0;
+    }
+
+    double GetNumber(string key)
+    {
+        if (Model.TryGetValue(key, out var value))
+        {
+            if (value is double doubleValue)
+                return doubleValue;
+            if (value is float floatValue)
+                return floatValue;
+            if (value is int intValue)
+                return intValue;
+            if (value is long longValue)
+                return longValue;
+        }
+
+        return 0.0;
+    }
+}
+
+<main id="site__main" class="p-2.5 h-[calc(100vh-var(--m-top))] mt-[--m-top]">
+
+    <div class="w-full max-w-6xl mx-auto">
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 mb-4">Fake News Detection Dashboard</h1>
+            <p class="text-gray-600">Overview of post verification status across the platform</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Statistics Cards -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Post Statistics</h2>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="font-medium text-gray-700">Total Posts</span>
+                        <span class="text-2xl font-bold text-blue-600">@GetCount("Total Posts")</span>
+                    </div>
+                    <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                        <span class="font-medium text-gray-700">Verified</span>
+                        <span class="text-2xl font-bold text-green-600">@GetCount("Verified")</span>
+                    </div>
+                    <div class="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+                        <span class="font-medium text-gray-700">Unverified</span>
+                        <span class="text-2xl font-bold text-yellow-600">@GetCount("Unverified")</span>
+                    </div>
+                    <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                        <span class="font-medium text-gray-700">Needs Verification</span>
+                        <span class="text-2xl font-bold text-red-600">@GetCount("Needs Verification")</span>
+                    </div>
+                    <div class="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                        <span class="font-medium text-gray-700">High Risk Posts</span>
+                        <span class="text-2xl font-bold text-purple-600">@GetCount("High Risk Posts")</span>
+                    </div>
+                    <div class="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                        <span class="font-medium text-gray-700">Reported Posts</span>
+                        <span class="text-2xl font-bold text-orange-600">@GetCount("Reported Posts")</span>
+                    </div>
+                    <div class="flex justify-between items-center p-3 bg-indigo-50 rounded-lg">
+                        <span class="font-medium text-gray-700">Avg Confidence</span>
+                        <span class="text-2xl font-bold text-indigo-600">@Math.Round(GetNumber("AverageConfidence"), 1)%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pie Chart -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Verification Distribution</h2>
+                <div class="relative">
+                    <canvas id="verificationChart" width="300" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories and Risk Levels -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <!-- Top Categories -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Top Categories</h2>
+                <div class="space-y-3">
+                    @if (Model.ContainsKey("Categories") && Model["Categories"] is Dictionary<string, int> categories)
+                    {
+                        @foreach (var category in categories)
+                        {
+                            <div class="flex justify-between items-center p-2 bg-blue-50 rounded-lg">
+                                <span class="text-sm font-medium text-blue-800">@category.Key</span>
+                                <span class="text-lg font-bold text-blue-600">@category.Value</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <!-- Risk Level Distribution -->
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Risk Level Distribution</h2>
+                <div class="space-y-3">
+                    @if (Model.ContainsKey("RiskLevels") && Model["RiskLevels"] is Dictionary<string, int> riskLevels)
+                    {
+                        @foreach (var risk in riskLevels.OrderByDescending(r => r.Value))
+                        {
+                            <div class="flex justify-between items-center p-2 rounded-lg" style="background-color: @(GetRiskColor(risk.Key));">
+                                <span class="text-sm font-medium" style="color: @(GetRiskTextColor(risk.Key));">@risk.Key</span>
+                                <span class="text-lg font-bold" style="color: @(GetRiskTextColor(risk.Key));">@risk.Value</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mt-6">
+            <div class="flex gap-4">
+                <a href="@Url.Action("Index", "Admin")" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                    Manage Reports
+                </a>
+                <a href="@Url.Action("Index", "Home")" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                    Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+</main>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const ctx = document.getElementById('verificationChart').getContext('2d');
+        const data = {
+            labels: ['Needs Verification', 'Unverified', 'Verified'],
+            datasets: [{
+                data: [@GetCount("Needs Verification"), @GetCount("Unverified"), @GetCount("Verified")],
+                backgroundColor: [
+                    '#fbbf24', // yellow for needs verification
+                    '#ef4444', // red for unverified
+                    '#10b981'  // green for verified
+                ],
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        };
+
+        const config = {
+            type: 'pie',
+            data: data,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((context.parsed / total) * 100);
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        new Chart(ctx, config);
+    </script>
+}

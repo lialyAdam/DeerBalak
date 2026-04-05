@@ -32,5 +32,11 @@ namespace DeerBalak.Controllers
             await _adminService.RejectReportAsync(postId);
             return RedirectToAction("Index");
         }
+
+        public async Task<IActionResult> Dashboard()
+        {
+            var stats = await _adminService.GetPostStatisticsAsync();
+            return View(stats);
+        }
     }
 }
