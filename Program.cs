@@ -34,8 +34,13 @@ builder.Services.AddSingleton<SimilarityService>();
 builder.Services.AddSingleton<AIService>();
 builder.Services.AddSingleton<HybridDetector>();
 
-// ✅ Fallback to LocalFilesService if blob connection string is missing or placeholder
-if (!string.IsNullOrWhiteSpace(blobConnectionString) && !blobConnectionString.Contains("xxx"))
+// ✅ Fallback to LocalFilesService if blob connection string is missing, empty, or placeholder
+bool isValidBlobConnection = !string.IsNullOrWhiteSpace(blobConnectionString) 
+    && !blobConnectionString.Contains("YOUR_")
+    && !blobConnectionString.Contains("xxx")
+    && blobConnectionString.Contains("=");
+
+if (isValidBlobConnection)
 {
     builder.Services.AddScoped<IFilesService>(s => new FilesService(blobConnectionString));
 }
