@@ -31,6 +31,7 @@ builder.Services.AddScoped<IStoriesService, StoriesService>();
 builder.Services.AddSingleton<FakeNewsService>();
 builder.Services.AddSingleton<TextProcessor>();
 builder.Services.AddSingleton<SimilarityService>();
+builder.Services.AddSingleton<AIService>();
 builder.Services.AddSingleton<HybridDetector>();
 
 // ✅ Fallback to LocalFilesService if blob connection string is missing or placeholder

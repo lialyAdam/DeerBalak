@@ -72,17 +72,28 @@
 
     string[] GetSuggestion(int score)
     {
+        // Score mapping: 0-10 with new labels
+        if (score >= 9)
+        {
+            return new[] { "🚨 DO NOT SHARE this content", "Requires immediate verification", "High likelihood of misinformation" };
+        }
+
         if (score >= 7)
         {
-            return new[] { "Verify with official sources", "Do not share until confirmed" };
+            return new[] { "⚠️ Do not share without verification", "Verify with official sources first", "Check multiple reliable sources" };
         }
 
-        if (score >= 4)
+        if (score >= 5)
         {
-            return new[] { "Be cautious before sharing", "Check multiple sources" };
+            return new[] { "🟡 Be very cautious before sharing", "Check source credibility", "Seek additional verification" };
         }
 
-        return new[] { "Content appears safe" };
+        if (score >= 3)
+        {
+            return new[] { "🔵 Be cautious before sharing", "Cross-check with other sources", "Verify facts if possible" };
+        }
+
+        return new[] { "🟢 Content appears safe to share" };
     }
 
     string GetRiskEmoji(string riskLevel) => riskLevel switch

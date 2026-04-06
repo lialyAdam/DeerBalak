@@ -1,0 +1,22 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "ConnectionStrings": {
+    "Default": "Server=(localdb)\\MSSQLLocalDB;Database=DeerBalakdb_TEST;Trusted_Connection=True;MultipleActiveResultSets=true"
+  },
+  "Auth": {
+    "Google": {
+      "ClientId": "YOUR_GOOGLE_CLIENT_ID",
+      "ClientSecret": "YOUR_GOOGLE_CLIENT_SECRET"
+    }
+  },
+  "AzureStorageConnectionString": "YOUR_AZURE_STORAGE_CONNECTION_STRING",
+  "OpenAI": {
+    "ApiKey": "YOUR_OPENAI_API_KEY"
+  },
+  "AllowedHosts": "*"
+}
