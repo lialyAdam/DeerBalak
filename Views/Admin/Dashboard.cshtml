@@ -1,8 +1,7 @@
-@model Dictionary<string, object>
+@model Deerbalak.Data.Dtos.AdminDashboardDto
 @{
     ViewData["Title"] = "Dashboard";
 
-    // Helper functions for risk level colors
     string GetRiskColor(string riskLevel) => riskLevel switch
     {
         "CRITICAL" => "#fee2e2", // red-100
@@ -20,39 +19,6 @@
         "LOW" => "#2563eb",      // blue-600
         _ => "#16a34a"           // green-600
     };
-
-    int GetCount(string key)
-    {
-        if (Model.TryGetValue(key, out var value) && value is int intValue)
-            return intValue;
-
-        var altKey = key.Replace(" ", "");
-        if (Model.TryGetValue(altKey, out var altValue) && altValue is int altInt)
-            return altInt;
-
-        var suffixedKey = key.Replace(" ", "") + "Posts";
-        if (Model.TryGetValue(suffixedKey, out var suffixedValue) && suffixedValue is int suffixedInt)
-            return suffixedInt;
-
-        return 0;
-    }
-
-    double GetNumber(string key)
-    {
-        if (Model.TryGetValue(key, out var value))
-        {
-            if (value is double doubleValue)
-                return doubleValue;
-            if (value is float floatValue)
-                return floatValue;
-            if (value is int intValue)
-                return intValue;
-            if (value is long longValue)
-                return longValue;
-        }
-
-        return 0.0;
-    }
 }
 
 <main id="site__main" class="p-2.5 h-[calc(100vh-var(--m-top))] mt-[--m-top]">
@@ -61,87 +27,269 @@
         <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
             <h1 class="text-2xl font-bold text-gray-800 mb-4">Fake News Detection Dashboard</h1>
             <p class="text-gray-600">Overview of post verification status across the platform</p>
+            @if (Model.EarlyWarningActive)
+            {
+                <div class="mt-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800">
+                    <strong>Early Warning:</strong> @Model.EarlyWarningMessage
+                </div>
+            }
+            <div class="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-sm text-gray-500">Story Mode Summary</div>
+                <div class="mt-2 text-gray-800">@Model.StorySummary</div>
+            </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <!-- Statistics Cards -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
+            <div class="bg-white rounded-xl shadow-sm p-6 xl:col-span-2">
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">Post Statistics</h2>
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
                         <span class="font-medium text-gray-700">Total Posts</span>
-                        <span class="text-2xl font-bold text-blue-600">@GetCount("Total Posts")</span>
+                        <span class="text-2xl font-bold text-blue-600">@Model.TotalPosts</span>
                     </div>
-                    <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <div class="flex justify-between items-center p-4 bg-green-50 rounded-lg">
                         <span class="font-medium text-gray-700">Verified</span>
-                        <span class="text-2xl font-bold text-green-600">@GetCount("Verified")</span>
+                        <span class="text-2xl font-bold text-green-600">@Model.VerifiedPosts</span>
                     </div>
-                    <div class="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+                    <div class="flex justify-between items-center p-4 bg-yellow-50 rounded-lg">
                         <span class="font-medium text-gray-700">Unverified</span>
-                        <span class="text-2xl font-bold text-yellow-600">@GetCount("Unverified")</span>
+                        <span class="text-2xl font-bold text-yellow-600">@Model.UnverifiedPosts</span>
                     </div>
-                    <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                    <div class="flex justify-between items-center p-4 bg-red-50 rounded-lg">
                         <span class="font-medium text-gray-700">Needs Verification</span>
-                        <span class="text-2xl font-bold text-red-600">@GetCount("Needs Verification")</span>
+                        <span class="text-2xl font-bold text-red-600">@Model.NeedsVerificationPosts</span>
                     </div>
-                    <div class="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                    <div class="flex justify-between items-center p-4 bg-purple-50 rounded-lg">
                         <span class="font-medium text-gray-700">High Risk Posts</span>
-                        <span class="text-2xl font-bold text-purple-600">@GetCount("High Risk Posts")</span>
+                        <span class="text-2xl font-bold text-purple-600">@Model.HighRiskPosts</span>
                     </div>
-                    <div class="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                    <div class="flex justify-between items-center p-4 bg-orange-50 rounded-lg">
                         <span class="font-medium text-gray-700">Reported Posts</span>
-                        <span class="text-2xl font-bold text-orange-600">@GetCount("Reported Posts")</span>
+                        <span class="text-2xl font-bold text-orange-600">@Model.ReportedPosts</span>
                     </div>
-                    <div class="flex justify-between items-center p-3 bg-indigo-50 rounded-lg">
+                    <div class="flex justify-between items-center p-4 bg-sky-50 rounded-lg">
+                        <span class="font-medium text-gray-700">Safe Posts</span>
+                        <span class="text-2xl font-bold text-sky-600">@Model.SafePosts</span>
+                    </div>
+                    <div class="flex justify-between items-center p-4 bg-amber-50 rounded-lg">
+                        <span class="font-medium text-gray-700">Medium Risk</span>
+                        <span class="text-2xl font-bold text-amber-600">@Model.MediumRiskPosts</span>
+                    </div>
+                    <div class="flex justify-between items-center p-4 bg-indigo-50 rounded-lg">
                         <span class="font-medium text-gray-700">Avg Confidence</span>
-                        <span class="text-2xl font-bold text-indigo-600">@Math.Round(GetNumber("AverageConfidence"), 1)%</span>
+                        <span class="text-2xl font-bold text-indigo-600">@Math.Round(Model.AverageConfidence, 1)%</span>
                     </div>
                 </div>
             </div>
 
             <!-- Pie Chart -->
             <div class="bg-white rounded-xl shadow-sm p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">Verification Distribution</h2>
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Risk Distribution</h2>
                 <div class="relative">
                     <canvas id="verificationChart" width="300" height="300"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- Categories and Risk Levels -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-            <!-- Top Categories -->
-            <div class="bg-white rounded-xl shadow-sm p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">Top Categories</h2>
-                <div class="space-y-3">
-                    @if (Model.ContainsKey("Categories") && Model["Categories"] is Dictionary<string, int> categories)
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
+            <div class="bg-white rounded-xl shadow-sm p-6 xl:col-span-2">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">High Risk Feed</h2>
+                <div class="space-y-4">
+                    @if (Model.HighRiskFeed.Any())
                     {
-                        @foreach (var category in categories)
+                        @foreach (var item in Model.HighRiskFeed)
                         {
-                            <div class="flex justify-between items-center p-2 bg-blue-50 rounded-lg">
-                                <span class="text-sm font-medium text-blue-800">@category.Key</span>
-                                <span class="text-lg font-bold text-blue-600">@category.Value</span>
+                            <div class="p-4 border rounded-lg bg-red-50">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="font-medium text-gray-800">@item.UserName</span>
+                                    <span class="text-sm text-red-700">Score: @item.Score</span>
+                                </div>
+                                <div class="text-sm text-gray-700">@item.Snippet</div>
+                                <div class="mt-2 text-xs text-gray-500">@item.Category • @item.RiskLevel • @item.Reports reports</div>
                             </div>
                         }
+                    }
+                    else
+                    {
+                        <div class="p-4 rounded-lg bg-gray-50 text-gray-600">No high-risk posts yet.</div>
                     }
                 </div>
             </div>
-
-            <!-- Risk Level Distribution -->
             <div class="bg-white rounded-xl shadow-sm p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">Risk Level Distribution</h2>
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Quick Insights</h2>
                 <div class="space-y-3">
-                    @if (Model.ContainsKey("RiskLevels") && Model["RiskLevels"] is Dictionary<string, int> riskLevels)
+                    <div class="p-4 rounded-xl bg-slate-50">
+                        <div class="text-sm text-gray-500">Most common issue</div>
+                        <div class="mt-2 font-semibold text-gray-800">@Model.MostCommonIssue</div>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-50">
+                        <div class="text-sm text-gray-500">Most risky category</div>
+                        <div class="mt-2 font-semibold text-gray-800">@Model.MostRiskyCategory</div>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-50">
+                        <div class="text-sm text-gray-500">High risk posts last 24h</div>
+                        <div class="mt-2 font-semibold text-gray-800">@Model.HighRiskPostsLast24Hours</div>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-50">
+                        <div class="text-sm text-gray-500">High risk last hour</div>
+                        <div class="mt-2 font-semibold text-gray-800">@Model.HighRiskPostsLastHour</div>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-50">
+                        <div class="text-sm text-gray-500">High risk last 6h</div>
+                        <div class="mt-2 font-semibold text-gray-800">@Model.HighRiskPostsLast6Hours</div>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-50">
+                        <div class="text-sm text-gray-500">Top reported user</div>
+                        <div class="mt-2 font-semibold text-gray-800">@Model.TopReportedUserName</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 mt-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Risk Prediction and Behavior Patterns</h2>
+            <div class="space-y-4">
+                @if (Model.RiskPredictions.Any())
+                {
+                    @foreach (var item in Model.RiskPredictions)
                     {
-                        @foreach (var risk in riskLevels.OrderByDescending(r => r.Value))
+                        <div class="p-4 rounded-lg bg-slate-50 border border-slate-200">
+                            <div class="flex justify-between items-center gap-4">
+                                <div>
+                                    <div class="font-medium text-gray-800">@item.UserName</div>
+                                    <div class="text-xs text-gray-500">@item.BehaviorPattern</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-semibold text-gray-800">@item.PredictionScore%@ chance of risky posting</div>
+                                    <div class="text-xs text-gray-500">@item.Badge</div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="p-4 rounded-lg bg-gray-50 text-gray-600">No prediction insights available.</div>
+                }
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Top Reported Users</h2>
+                <div class="space-y-3">
+                    @if (Model.TopReportedUsers.Any())
+                    {
+                        @foreach (var user in Model.TopReportedUsers)
                         {
-                            <div class="flex justify-between items-center p-2 rounded-lg" style="background-color: @(GetRiskColor(risk.Key));">
-                                <span class="text-sm font-medium" style="color: @(GetRiskTextColor(risk.Key));">@risk.Key</span>
-                                <span class="text-lg font-bold" style="color: @(GetRiskTextColor(risk.Key));">@risk.Value</span>
+                            <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                                <div>
+                                    <div class="font-medium text-gray-800">@user.UserName</div>
+                                    <div class="text-xs text-gray-500">@user.Value reports • @user.Badge</div>
+                                </div>
+                                <span class="text-sm text-red-700">@user.Status</span>
                             </div>
                         }
                     }
+                    else
+                    {
+                        <div class="p-4 rounded-lg bg-gray-50 text-gray-600">No reported users yet.</div>
+                    }
                 </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Repeat Offenders</h2>
+                <div class="space-y-3">
+                    @if (Model.RepeatOffenders.Any())
+                    {
+                        @foreach (var offender in Model.RepeatOffenders)
+                        {
+                            <div class="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                                <div>
+                                    <div class="font-medium text-gray-800">@offender.UserName</div>
+                                    <div class="text-xs text-gray-500">@offender.Value risky posts • @offender.Badge</div>
+                                </div>
+                                <span class="text-sm text-orange-700">@offender.Status</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="p-4 rounded-lg bg-gray-50 text-gray-600">No repeat offenders identified.</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Top Trusted Users</h2>
+                <div class="space-y-3">
+                    @if (Model.TopTrustedUsers.Any())
+                    {
+                        @foreach (var trusted in Model.TopTrustedUsers)
+                        {
+                            <div class="flex justify-between items-center p-3 bg-emerald-50 rounded-lg">
+                                <div>
+                                    <div class="font-medium text-gray-800">@trusted.UserName</div>
+                                    <div class="text-xs text-gray-500">@trusted.Value posts • @trusted.Badge</div>
+                                </div>
+                                <span class="text-sm text-emerald-700">@trusted.TrustScore%</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="p-4 rounded-lg bg-gray-50 text-gray-600">No trusted users available.</div>
+                    }
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Risk Level Distribution</h2>
+                <div class="space-y-3">
+                    @if (Model.RiskLevels.Any())
+                    {
+                        @foreach (var risk in Model.RiskLevels.OrderByDescending(r => r.Value))
+                        {
+                            <div class="flex justify-between items-center p-3 rounded-lg" style="background-color: @(GetRiskColor(risk.Key));">
+                                <span class="font-medium" style="color: @(GetRiskTextColor(risk.Key));">@risk.Key</span>
+                                <span class="font-bold" style="color: @(GetRiskTextColor(risk.Key));">@risk.Value</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="p-4 rounded-lg bg-gray-50 text-gray-600">No risk level data available.</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm p-6 mt-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Similarity Alerts</h2>
+            <div class="space-y-3">
+                @if (Model.SimilarityAlerts.Any())
+                {
+                    @foreach (var alert in Model.SimilarityAlerts)
+                    {
+                        <div class="p-4 rounded-lg bg-amber-50 border border-amber-200">
+                            <div class="flex justify-between items-center mb-2">
+                                <div>
+                                    <div class="font-medium text-gray-800">@alert.UserName</div>
+                                    <div class="text-xs text-gray-500">@alert.Category</div>
+                                </div>
+                                <span class="text-sm text-amber-700">@alert.SimilarityPercent% similar</span>
+                            </div>
+                            <div class="text-sm text-gray-700">@alert.Snippet</div>
+                            <div class="mt-2 text-xs text-gray-500">@alert.Reason</div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="p-4 rounded-lg bg-gray-50 text-gray-600">No similarity alerts detected.</div>
+                }
             </div>
         </div>
 
@@ -164,13 +312,13 @@
     <script>
         const ctx = document.getElementById('verificationChart').getContext('2d');
         const data = {
-            labels: ['Needs Verification', 'Unverified', 'Verified'],
+            labels: ['High Risk', 'Medium Risk', 'Safe'],
             datasets: [{
-                data: [@GetCount("Needs Verification"), @GetCount("Unverified"), @GetCount("Verified")],
+                data: [@Model.HighRiskPosts, @Model.MediumRiskPosts, @Model.SafePosts],
                 backgroundColor: [
-                    '#fbbf24', // yellow for needs verification
-                    '#ef4444', // red for unverified
-                    '#10b981'  // green for verified
+                    '#ef4444', // red
+                    '#f59e0b', // orange
+                    '#10b981'  // green
                 ],
                 borderWidth: 2,
                 borderColor: '#ffffff'
