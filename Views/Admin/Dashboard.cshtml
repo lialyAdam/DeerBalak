@@ -78,7 +78,7 @@
                     </div>
                     <div class="flex justify-between items-center p-4 bg-indigo-50 rounded-lg">
                         <span class="font-medium text-gray-700">Avg Confidence</span>
-                        <span class="text-2xl font-bold text-indigo-600">@Math.Round(Model.AverageConfidence, 1)%</span>
+                        <span class="text-2xl font-bold text-indigo-600">@((Math.Round(Model.AverageConfidence, 1)))%</span>
                     </div>
                 </div>
             </div>
@@ -161,7 +161,7 @@
                                     <div class="text-xs text-gray-500">@item.BehaviorPattern</div>
                                 </div>
                                 <div class="text-right">
-                                    <div class="font-semibold text-gray-800">@item.PredictionScore%@ chance of risky posting</div>
+                                    <div class="font-semibold text-gray-800">@(item.PredictionScore)% chance of risky posting</div>
                                     <div class="text-xs text-gray-500">@item.Badge</div>
                                 </div>
                             </div>
@@ -235,7 +235,7 @@
                                     <div class="font-medium text-gray-800">@trusted.UserName</div>
                                     <div class="text-xs text-gray-500">@trusted.Value posts • @trusted.Badge</div>
                                 </div>
-                                <span class="text-sm text-emerald-700">@trusted.TrustScore%</span>
+                                <span class="text-sm text-emerald-700">@(trusted.TrustScore)%</span>
                             </div>
                         }
                     }
@@ -279,7 +279,7 @@
                                     <div class="font-medium text-gray-800">@alert.UserName</div>
                                     <div class="text-xs text-gray-500">@alert.Category</div>
                                 </div>
-                                <span class="text-sm text-amber-700">@alert.SimilarityPercent% similar</span>
+                                <span class="text-sm text-amber-700">@(alert.SimilarityPercent)% similar</span>
                             </div>
                             <div class="text-sm text-gray-700">@alert.Snippet</div>
                             <div class="mt-2 text-xs text-gray-500">@alert.Reason</div>
