@@ -7,7 +7,7 @@
   },
   "AzureStorageConnectionString": "DefaultEndpointsProtocol=https;AccountName=devstorageaccount;AccountKey=devkey==;EndpointSuffix=core.windows.net",
   "OpenAI": {
-    "ApiKey": "sk-dev-key-placeholder-for-testing"
+    "ApiKey": "sk-your-actual-openai-api-key-here"
   },
   "Auth": {
     "Google": {

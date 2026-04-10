@@ -1,29 +1,28 @@
 ﻿ @model List<UserWithFriendsCountVM>
 
-<div class="flex items-baseline justify-between text-black">
-    <h3 class="font-bold text-base"> People you may know </h3>
-</div>
+<div class="space-y-4">
+    <div class="flex items-center justify-between text-black">
+        <h3 class="font-bold text-base">People you may know</h3>
+    </div>
 
-<div class="side-list">
-    @foreach (var user in Model)
-    {
-        <div class="side-list-item">
-            <a asp-controller="Users" asp-action="Details" asp-route-userId="1">
-                <img src="@(string.IsNullOrEmpty(user.ProfilePictureUrl) ? Url.Content("~/images/avatar/user.png") : user.ProfilePictureUrl)" class="side-list-image rounded-full" />
-            </a>
-            <div class="flex-1">
-                <a>
-                    <h4 class="side-list-title">
-                        @user.FullName
-                    </h4>
+    <div class="space-y-3">
+        @foreach (var user in Model)
+        {
+            <div class="flex items-center gap-3 p-3 rounded-3xl border border-slate-200 bg-slate-50/80 shadow-sm">
+                <a asp-controller="Users" asp-action="Details" asp-route-userId="@user.UserId">
+                    <img src="@(string.IsNullOrEmpty(user.ProfilePictureUrl) ? Url.Content("~/images/avatar/user.png") : user.ProfilePictureUrl)" class="w-12 h-12 rounded-full object-cover" />
                 </a>
-                <div class="side-list-info">@user.FriendsCountDisplay</div>
+                <div class="flex-1 min-w-0">
+                    <a asp-controller="Users" asp-action="Details" asp-route-userId="@user.UserId" class="block truncate">
+                        <h4 class="side-list-title font-semibold text-sm text-slate-900 truncate">@user.FullName</h4>
+                    </a>
+                    <div class="side-list-info text-xs text-slate-500">@user.FriendsCountDisplay</div>
+                </div>
+                <form asp-controller="Friends" asp-action="SendFriendRequest" method="post" class="shrink-0">
+                    <input type="hidden" name="receiverId" value="@user.UserId" />
+                    <button type="submit" class="text-xs font-semibold rounded-full px-3 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200">Follow</button>
+                </form>
             </div>
-            <form asp-controller="Friends" asp-action="SendFriendRequest" method="post">
-                <input type="hidden" name="receiverId" value="@user.UserId" />
-                <button type="submit" class="button bg-primary-soft text-primary">Follow</button>
-            </form>
-        </div>
-    }
-
+        }
+    </div>
 </div>
