@@ -1,7 +1,7 @@
 ﻿@model List<Post>
 
 <main id="site__main" class="bg-gray-50 min-h-screen">
-    <div class="grid grid-cols-1 lg:grid-cols-[270px_1fr_340px] gap-6 max-w-[1400px] mx-auto px-4 py-6">
+    <div class="grid grid-cols-1 md:grid-cols-[1fr_300px] lg:grid-cols-[270px_1fr_340px] gap-6 max-w-[1400px] mx-auto px-4 py-6">
         
         <!-- Left Sidebar (Stories) -->
         <div class="hidden lg:block">
@@ -54,7 +54,7 @@
             </div>
         </div>
         <!-- Right Sidebar (Suggested Friends & Hashtags) -->
-        <div class="hidden lg:block space-y-4 lg:pb-8 lg:sticky lg:top-4">
+        <div class="hidden md:block space-y-4 lg:pb-8 lg:sticky lg:top-4">
                 <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
                     @await Component.InvokeAsync("SuggestedFriends")
                 </div>
