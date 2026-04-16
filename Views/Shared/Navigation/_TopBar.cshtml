@@ -7,7 +7,7 @@
     var profilePictureUrl = loggedInUser?.ProfilePictureUrl;
 }
 
-<header class="z-[100] h-[--m-top] fixed top-0 left-0 w-full flex items-center bg-white/80 sky-50 backdrop-blur-xl border-b border-slate-200">
+<header class="navbar z-[100] h-[--m-top] fixed top-0 left-0 w-full border-b border-slate-200 bg-white/95 backdrop-blur-xl">
     <div class="2xl:w-[--w-side] lg:w-[--w-side-sm]">
         <div class="flex items-center gap-1">
             <button uk-toggle="target: #site__sidebar ; cls :!-translate-x-0"
@@ -25,18 +25,17 @@
 
         </div>
     </div>
-    <div class="flex-1 relative">
-        <div class="max-w-[1220px] mx-auto flex items-center">
-            <form id="search--box"
-                  class="xl:w-[680px] sm:w-96 sm:relative rounded-xl overflow-hidden z-20 bg-secondery max-md:hidden w-screen left-0 max-sm:fixed max-sm:top-2">
+    <div class="flex-1 relative px-4">
+        <div class="max-w-[1220px] mx-auto flex items-center justify-between gap-4">
+            <div class="flex-1 flex justify-center">
+                <form id="search--box"
+                      class="search-bar relative w-full max-w-[650px] rounded-full overflow-hidden z-20 bg-white border border-slate-200 shadow-sm flex">
+                    <ion-icon name="search" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></ion-icon>
+                    <input type="text" name="query" placeholder="Search Posts, Friends..." class="w-full pl-12 pr-4 h-12 rounded-full bg-white text-sm text-slate-700 border-none focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                </form>
+            </div>
 
-                <ion-icon name="search" class="absolute left-4 top-1/2 -translate-y-1/2"></ion-icon>
-                <input type="text" name="query" placeholder="Search Posts, Friends..." class="w-full !pl-10 !font-normal !bg-transparent h-12 !text-sm" />
-            </form>
-        </div>
-
-        <div class="max-w-[1220px] mx-auto flex items-center">
-            <div class="flex items-center sm:gap-4 gap-2 absolute right-5 top-1/2 -translate-y-1/2 text-black">
+            <div class="flex items-center sm:gap-4 gap-2 text-black shrink-0">
 
                 @* notification icon *@
                 <button type="button" class="sm:p-2 p-1 rounded-full relative sm:bg-secondery" id="notificationsBtn">

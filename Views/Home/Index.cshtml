@@ -1,15 +1,15 @@
 ﻿@model List<Post>
 
-<main id="site__main" class="bg-gray-50 min-h-screen">
-    <div class="grid grid-cols-1 md:grid-cols-[1fr_300px] lg:grid-cols-[270px_1fr_340px] gap-6 max-w-[1400px] mx-auto px-4 py-6">
+<main id="site__main" class="bg-gray-50 min-h-screen mt-[--m-top]">
+    <div class="main-container grid grid-cols-1 lg:grid-cols-[270px_1fr_340px] gap-6 max-w-[1400px] mx-auto px-4 py-6">
         
         <!-- Left Sidebar (Stories) -->
-        <div class="hidden lg:block">
+        <div class="sidebar-left hidden lg:block">
             @await Component.InvokeAsync("Stories")
         </div>
 
         <!-- Center Feed -->
-        <div class="flex flex-col">
+        <div class="feed flex flex-col items-center">
             
             <div class="max-w-full flex-1 xl:space-y-6 space-y-3">
 
@@ -31,7 +31,7 @@
 
                 </div>
 
-                <div id="posts-container" class="space-y-4">
+                <div id="posts-container" class="space-y-4 w-full max-w-[650px] mx-auto">
 
                     @if (Model.Count == 0)
                     {
@@ -54,7 +54,7 @@
             </div>
         </div>
         <!-- Right Sidebar (Suggested Friends & Hashtags) -->
-        <div class="hidden md:block space-y-4 lg:pb-8 lg:sticky lg:top-4">
+        <div class="sidebar-right hidden md:block lg:pb-8 lg:sticky lg:top-[calc(var(--m-top)+20px)] lg:w-[340px]">
                 <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
                     @await Component.InvokeAsync("SuggestedFriends")
                 </div>
