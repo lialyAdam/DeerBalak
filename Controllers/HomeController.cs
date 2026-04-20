@@ -37,14 +37,24 @@ namespace DeerBalak.Controllers
             _notificationsService = notificationsService;
         }
 
-        public async Task<IActionResult> Index()
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
             var loggedInUserId = GetUserId();
             if (loggedInUserId == null) return RedirectToLogin();
 
-            var allPosts = await _postsService.GetAllPostsAsync(loggedInUserId.Value);
+            var posts = await _postsService.GetFeedAsync(loggedInUserId.Value, page, pageSize);
+            var totalPosts = await _postsService.GetTotalPostsCountAsync(loggedInUserId.Value);
 
-            return View(allPosts);
+            var pagedPosts = new PagedPostsVM
+            {
+                Posts = posts,
+                CurrentPage = page,
+                PageSize = pageSize,
+                TotalPosts = totalPosts
+            };
+
+            return View(pagedPosts);
         }
         public async Task<IActionResult> Details(int postId)
         {

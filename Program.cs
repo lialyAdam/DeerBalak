@@ -11,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddResponseCaching();
 
 //Database Configuration
 var dbConnectionString = builder.Configuration.GetConnectionString("Default");
@@ -35,10 +36,12 @@ builder.Services.AddSingleton<AIService>();
 builder.Services.AddSingleton<HybridDetector>();
 
 // ✅ Fallback to LocalFilesService if blob connection string is missing, empty, or placeholder
-bool isValidBlobConnection = !string.IsNullOrWhiteSpace(blobConnectionString) 
+// For development, always use LocalFilesService to avoid Azurite setup issues
+bool isValidBlobConnection = !string.IsNullOrWhiteSpace(blobConnectionString)
     && !blobConnectionString.Contains("YOUR_")
     && !blobConnectionString.Contains("xxx")
-    && blobConnectionString.Contains("=");
+    && blobConnectionString.Contains("=")
+    && !builder.Environment.IsDevelopment(); // Force LocalFilesService in development
 
 if (isValidBlobConnection)
 {
@@ -105,6 +108,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseResponseCaching();
 
 app.UseRouting();
 app.UseAuthentication();

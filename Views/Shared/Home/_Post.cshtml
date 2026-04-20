@@ -203,7 +203,7 @@
     {
         <a asp-controller="Home" asp-action="Details" asp-route-postId="@Model.Id">
             <div class="relative w-full h-full">
-                <img src="@Model.ImageUrl" class="sm:rounded-lg w-full h-full object-cover" />
+                <img loading="lazy" src="@Model.ImageUrl" class="sm:rounded-lg w-full h-full object-cover" />
             </div>
         </a>
     }

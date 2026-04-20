@@ -31,6 +31,7 @@ namespace DeerBalak.Controllers
             return Json(count);
         }
 
+        [HttpGet]
         public async Task<IActionResult> GetNotifications()
         {
             var userId = GetUserId();

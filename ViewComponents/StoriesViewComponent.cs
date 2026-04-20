@@ -16,8 +16,8 @@ namespace DeerBalak.ViewComponents
         }
         public async Task <IViewComponentResult> InvokeAsync()
         {
-            var allStories = await _storiesService.GetAllStoriesAsync();
-            return View(allStories);        
+            var recentStories = await _storiesService.GetRecentStoriesAsync(12);
+            return View(recentStories);        
         
         }
     }

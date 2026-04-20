@@ -19,7 +19,7 @@ namespace DeerBalak.ViewComponents
             var loggedInUserId = ((ClaimsPrincipal)User).FindFirstValue(ClaimTypes.NameIdentifier);
             var userId = int.Parse(loggedInUserId);
 
-            var suggestedFriends = await _friendsService.GetSuggestedFriendsAsync(userId);
+            var suggestedFriends = await _friendsService.GetSuggestedFriendsAsync(userId, 5);
 
             var suggestedFriendsVM = suggestedFriends.Select(n => new UserWithFriendsCountVM()
             {

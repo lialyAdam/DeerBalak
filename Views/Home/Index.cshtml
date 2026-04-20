@@ -1,37 +1,40 @@
-﻿@model List<Post>
+﻿@model PagedPostsVM
 
 <main id="site__main" class="bg-gray-50 min-h-screen mt-[--m-top]">
-    <div class="main-container">
+    <div class="main-container grid grid-cols-12 gap-6 px-4">
         
-        <!-- Left Sidebar (Stories) -->
-        <div class="sidebar-left hidden lg:block">
-            @await Component.InvokeAsync("Stories")
+        <!-- Left Sidebar -->
+        <div class="sidebar-left hidden lg:block col-span-3">
         </div>
 
         <!-- Center Feed -->
-        <div class="feed flex flex-col items-center">
+        <div class="feed flex flex-col items-center col-span-12 lg:col-span-6">
             
             <div class="max-w-full flex-1 xl:space-y-6 space-y-3">
 
-                <div class="bg-white rounded-xl shadow-sm md:p-4 p-2 space-y-4 text-sm font-medium border border-gray-200">
-                    <!-- Camera Button - Top Left -->
-                    <div class="post-actions-bar flex items-center justify-start gap-3 pb-3 border-b border-gray-100">
-                        <button type="button" class="action-btn flex items-center justify-center p-2 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition-colors" uk-toggle="target: #create-status">
-                            <ion-icon name="camera" class="text-lg"></ion-icon>
-                        </button>
+                <div class="bg-white rounded-xl shadow-sm md:p-4 p-2 space-y-4 text-sm font-medium border border-gray-200 w-full max-w-[650px] mx-auto">
+
+                    <!-- Stories inside the top box -->
+                    <div class="stories-box pb-4 border-b border-gray-100">
+                        @await Component.InvokeAsync("Stories")
                     </div>
 
-                    <!-- Input Field -->
-                    <div class="flex items-center gap-3 pt-3">
-                        <div class="flex-1 bg-slate-100 hover:bg-opacity-80 transition-all rounded-lg cursor-pointer" uk-toggle="target: #create-status">
-                            <div class="py-2.5 text-center">What do you have in mind?</div>
+                    <!-- Status composer inside the same box -->
+                    <div class="post-actions-bar flex flex-col gap-3">
+                        <div class="flex items-center justify-start gap-3">
+                            <button type="button" class="action-btn flex items-center justify-center p-2 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition-colors" uk-toggle="target: #create-status">
+                                <ion-icon name="camera" class="text-lg"></ion-icon>
+                            </button>
+                            <div class="flex-1 bg-slate-100 hover:bg-opacity-80 transition-all rounded-lg cursor-pointer" uk-toggle="target: #create-status">
+                                <div class="py-2.5 text-center">What do you have in mind?</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div id="posts-container" class="space-y-4 w-full max-w-[650px] mx-auto">
 
-                    @if (Model.Count == 0)
+                    @if (Model.Posts.Count == 0)
                     {
                         <div class="bg-white rounded-xl shadow-sm md:p-4 p-2 space-y-4 text-sm font-medium border border-gray-200">
                             Currently, there are no posts available. Would you like to create the first one?
@@ -39,11 +42,37 @@
                     }
                     else
                     {
-                        @foreach (var post in Model)
+                        @foreach (var post in Model.Posts)
                         {
                             <partial name="Home/_Post"
                                      model="post"
                                      view-data='new ViewDataDictionary(ViewData) { { "ShowAllComment", false } }' />
+                        }
+
+                        <!-- Pagination -->
+                        @if (Model.TotalPages > 1)
+                        {
+                            <div class="bg-white rounded-xl shadow-sm md:p-4 p-2 text-center border border-gray-200">
+                                @if (Model.CurrentPage > 1)
+                                {
+                                    <a href="@Url.Action("Index", new { page = Model.CurrentPage - 1, pageSize = Model.PageSize })" class="px-3 py-1 bg-blue-500 text-white rounded mr-2">Previous</a>
+                                }
+                                @for (int i = Math.Max(1, Model.CurrentPage - 2); i <= Math.Min(Model.TotalPages, Model.CurrentPage + 2); i++)
+                                {
+                                    if (i == Model.CurrentPage)
+                                    {
+                                        <span class="px-3 py-1 bg-blue-600 text-white rounded mx-1">@i</span>
+                                    }
+                                    else
+                                    {
+                                        <a href="@Url.Action("Index", new { page = i, pageSize = Model.PageSize })" class="px-3 py-1 bg-blue-500 text-white rounded mx-1">@i</a>
+                                    }
+                                }
+                                @if (Model.CurrentPage < Model.TotalPages)
+                                {
+                                    <a href="@Url.Action("Index", new { page = Model.CurrentPage + 1, pageSize = Model.PageSize })" class="px-3 py-1 bg-blue-500 text-white rounded ml-2">Next</a>
+                                }
+                            </div>
                         }
                     }
                 </div>
@@ -52,13 +81,12 @@
             </div>
         </div>
         <!-- Right Sidebar (Suggested Friends & Hashtags) -->
-        <div class="sidebar-right hidden md:block lg:pb-8 lg:sticky lg:top-[calc(var(--m-top)+20px)] lg:w-[340px]">
-                <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
-                    @await Component.InvokeAsync("SuggestedFriends")
-                </div>
-                <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
-                    @await Component.InvokeAsync("Hashtags")
-                </div>
+        <div class="sidebar-right hidden md:block col-span-3 lg:pb-8 lg:sticky lg:top-[calc(var(--m-top)+20px)]">
+            <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+                @await Component.InvokeAsync("SuggestedFriends")
+            </div>
+            <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+                @await Component.InvokeAsync("Hashtags")
             </div>
         </div>
     </div>
@@ -145,3 +173,5 @@
 
 
 </script>
+
+
