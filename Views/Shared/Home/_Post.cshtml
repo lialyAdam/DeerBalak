@@ -120,9 +120,12 @@
     @* Post heading *@
     <div class="flex gap-3 sm:p-3 p-2 text-sm font-medium">
         <a asp-controller="Users" asp-action="Details" asp-route-userId="@Model.UserId">
-            <img src="@(!string.IsNullOrEmpty(Model.User.ProfilePictureUrl) ?
+            <img loading="lazy" 
+                 decoding="async"
+                 src="@(!string.IsNullOrEmpty(Model.User.ProfilePictureUrl) ?
         Model.User.ProfilePictureUrl :
-        Url.Content("~/images/avatar/user.png"))" class="w-9 h-9 rounded-full" />
+        Url.Content("~/images/avatar/user.png"))" 
+                 class="w-9 h-9 rounded-full" />
         </a>
         <div class="flex-1">
             <a asp-controller="Users" asp-action="Details" asp-route-userId="@Model.UserId">
@@ -230,10 +233,37 @@
                 <div class="text-center text-xs text-gray-500">@postLabel</div>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
-                <span class="font-semibold">Similarity:</span>
-                <span class="text-sm">@(Math.Round(Model.FakeNewsSimilarity * 100, 0))%</span>
-            </div>
+            <!-- 📡 Claim Tracking -->
+            @if (Model.IsRepeatedClaim || Model.AppearedCount > 1)
+            {
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-2">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-lg">📡</span>
+                        <span class="font-semibold text-gray-800">Claim Tracking</span>
+                    </div>
+                    <div class="grid grid-cols-1 gap-1 text-sm">
+                        <div class="flex items-center gap-2">
+                            <span class="text-green-600">🔁</span>
+                            <span>Appeared: <strong>@Model.AppearedCount times</strong></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-blue-600">👥</span>
+                            <span>Shared by: <strong>@Model.UniqueUsersCount users</strong></span>
+                        </div>
+                        @if (Model.FirstSeen.HasValue)
+                        {
+                            <div class="flex items-center gap-2">
+                                <span class="text-purple-600">📅</span>
+                                <span>First seen: <strong>@GetDaysAgoText(Model.FirstSeen.Value)</strong></span>
+                            </div>
+                        }
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-orange-600">⚠️</span>
+                            <span>Status: <strong class="@GetSpreadLevelClass(Model.SpreadLevel)">@Model.SpreadLevel</strong></span>
+                        </div>
+                    </div>
+                </div>
+            }
 
             <!-- 🚀 2) Context Tagging -->
             @if (!string.IsNullOrEmpty(Model.Category))
@@ -268,6 +298,19 @@
             }
 
             <!-- 🚀 3) Enhanced Risk Explanation Level -->
+            @if (Model.AppearedCount > 1)
+            {
+                <div class="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-orange-600 text-lg">⚠️</span>
+                        <span class="font-semibold text-orange-800">This content appeared @Model.AppearedCount times</span>
+                    </div>
+                    <div class="text-sm text-orange-700 mt-1">
+                        AI: Repeated claims increase the likelihood of misinformation. Please verify before sharing.
+                    </div>
+                </div>
+            }
+
             @if (Model.FakeNewsReasons != null && Model.FakeNewsReasons.Any())
             {
                 <div class="text-xs text-gray-600">
@@ -370,7 +413,10 @@
 
                     <div class="flex items-start gap-3 relative">
                         <a asp-controller="Users" asp-action="Details" asp-route-userId="@comment.UserId">
-                            <img src="@(!string.IsNullOrEmpty(comment.User.ProfilePictureUrl) ? comment.User.ProfilePictureUrl : Url.Content("~/images/avatar/user.png"))" class="w-6 h-6 mt-1 rounded-full" />
+                            <img loading="lazy" 
+                                 decoding="async"
+                                 src="@(!string.IsNullOrEmpty(comment.User.ProfilePictureUrl) ? comment.User.ProfilePictureUrl : Url.Content("~/images/avatar/user.png"))" 
+                                 class="w-6 h-6 mt-1 rounded-full" />
                         </a>
                         <div class="flex-1">
                             <div class="flex justify-content-between">
@@ -413,7 +459,10 @@
                 @Html.AntiForgeryToken()
                 <div class="sm:px-4 sm:py-3 p-2.5 border-t border-gray-100 flex items-center gap-1">
                     <a asp-controller="Users" asp-action="Detalis" asp-route-userId="@Model.UserId">
-                        <img src="@(string.IsNullOrEmpty(Model.User.ProfilePictureUrl) ? Url.Content("~/images/avatar/user.png") : Model.User.ProfilePictureUrl)" class="w-6 h-6 rounded-full" />
+                        <img loading="lazy" 
+                             decoding="async"
+                             src="@(string.IsNullOrEmpty(Model.User.ProfilePictureUrl) ? Url.Content("~/images/avatar/user.png") : Model.User.ProfilePictureUrl)" 
+                             class="w-6 h-6 rounded-full" />
                     </a>
 
 
@@ -486,5 +535,28 @@
         });
     });
 </script>
+
+@functions {
+    public string GetDaysAgoText(DateTime firstSeen)
+    {
+        var days = (DateTime.UtcNow - firstSeen).TotalDays;
+        if (days < 1) return "today";
+        if (days < 7) return $"{(int)days} days ago";
+        if (days < 30) return $"{(int)(days / 7)} weeks ago";
+        if (days < 365) return $"{(int)(days / 30)} months ago";
+        return $"{(int)(days / 365)} years ago";
+    }
+
+    public string GetSpreadLevelClass(string spreadLevel)
+    {
+        return spreadLevel switch
+        {
+            "VIRAL" => "text-red-600 font-bold",
+            "HIGH" => "text-orange-600 font-semibold",
+            "MEDIUM" => "text-yellow-600 font-medium",
+            _ => "text-green-600 font-medium"
+        };
+    }
+}
 
 

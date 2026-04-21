@@ -1,10 +1,9 @@
-﻿@inject UserManager<User> UserManager;
+﻿@using System.Security.Claims
 
 @{
-    var loggedInUser = await UserManager.GetUserAsync(User);
-    var userName = loggedInUser?.UserName;
-    var fullName = loggedInUser?.FullName;
-    var profilePictureUrl = loggedInUser?.ProfilePictureUrl;
+    var userName = User.FindFirstValue(ClaimTypes.Email);
+    var fullName = User.FindFirstValue(ClaimTypes.Name);
+    var profilePictureUrl = User.FindFirstValue("ProfilePictureUrl");
 }
 
 <header class="navbar">
@@ -16,7 +15,7 @@
         </button>
 
         <div id="logo">
-            <a asp-controller="Home" class="flex items-center">
+            <a asp-controller="Home" asp-action="Index" class="flex items-center">
                 <img src="~/images/WhiteLogo.png" class="w-10 md:block hidden" />
                 <span class="ml-2 text-lg font-semibold">DeerBalakAlena</span>
             </a>
@@ -42,13 +41,19 @@
         <div id="notification-dropdown" class="hidden absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-xl shadow-xl border border-gray-200 z-50"></div>
 
         <div class="rounded-full relative cursor-pointer">
-            <img src="@(string.IsNullOrEmpty(profilePictureUrl) ? Url.Content("~/images/avatar/user.png") : profilePictureUrl)" class="w-9 h-9 rounded-full shadow" />
+            <img loading="lazy" 
+                 decoding="async"
+                 src="@(string.IsNullOrEmpty(profilePictureUrl) ? Url.Content("~/images/avatar/user.png") : profilePictureUrl)" 
+                 class="w-9 h-9 rounded-full shadow" />
         </div>
 
         <div class="hidden bg-white rounded-lg drop-shadow-xl w-64 border border-gray-200" uk-drop="offset:6;pos: bottom-right; animate-out: true;">
             <a>
                 <div class="p-4 py-5 flex items-center gap-4">
-                    <img src="@(string.IsNullOrEmpty(profilePictureUrl) ? Url.Content("~/images/avatar/user.png") : profilePictureUrl)" class="w-10 h-10 rounded-full shadow" />
+                    <img loading="lazy" 
+                         decoding="async"
+                         src="@(string.IsNullOrEmpty(profilePictureUrl) ? Url.Content("~/images/avatar/user.png") : profilePictureUrl)" 
+                         class="w-10 h-10 rounded-full shadow" />
                     <div class="flex-1">
                         <h4 class="text-sm font-medium text-black">@fullName</h4>
                         <div class="text-sm mt-1 text-blue-600 font-light">@userName</div>
@@ -110,27 +115,37 @@
             .then(() => console.log("SignalR connected"))
             .catch((err) => console.log("SignalR connection error: ", err))
 
-    })
+        // Setup notification button event listener
+        const notificationDropdown = document.getElementById('notification-dropdown');
+        const notificationsBtn = document.getElementById('notificationsBtn');
 
-    const notificationDropdown = document.getElementById('notification-dropdown');
+        if (notificationsBtn && notificationDropdown) {
+            console.log('Setting up notification button event listener');
+            notificationsBtn.addEventListener('click', () => {
+                console.log('Notifications button clicked');
+                if (!notificationDropdown.classList.contains('hidden')) {
+                    notificationDropdown.classList.add('hidden');
+                    return;
+                }
 
-    console.log('Setting up notification button event listener');
-    document.getElementById('notificationsBtn').addEventListener('click', () => {
-        console.log('Notifications button clicked');
-        if (!notificationDropdown.classList.contains('hidden')) {
-            notificationDropdown.classList.add('hidden');
-            return;
+                fetch('/Notifications/GetNotifications')
+                    .then(resp => resp.text())
+                    .then(html => {
+                        notificationDropdown.innerHTML = html.trim() || '<div class="p-4 text-sm text-slate-500">No notifications yet</div>';
+                        notificationDropdown.classList.remove('hidden');
+                    })
+                    .catch(error => {
+                        console.error('Error loading notifications: ', error);
+                    });
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!notificationDropdown.classList.contains('hidden') && !notificationDropdown.contains(event.target) && !notificationsBtn.contains(event.target)) {
+                    notificationDropdown.classList.add('hidden');
+                }
+            });
         }
 
-        fetch('/Notifications/GetNotifications')
-            .then(resp => resp.text())
-            .then(html => {
-                notificationDropdown.innerHTML = html;
-                notificationDropdown.classList.remove('hidden');
-            })
-            .catch(error => {
-                console.error('Error loading notifications: ', error);
-            });
     })
 
     function setNotificationAsRead(notificationId) {

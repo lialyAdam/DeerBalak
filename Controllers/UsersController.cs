@@ -27,11 +27,21 @@ namespace DeerBalak.Controllers
         {
             return View();
         }
-        public async Task<IActionResult> Details(int userId)
+        public async Task<IActionResult> Details(int? id, int? userId)
         {
-            var user = await _userManager.FindByIdAsync(userId.ToString());
-            var userPost = await _usersService.GetUserPosts(userId);
+            var resolvedUserId = userId ?? id;
+            if (!resolvedUserId.HasValue)
+            {
+                return NotFound();
+            }
 
+            var user = await _userManager.FindByIdAsync(resolvedUserId.Value.ToString());
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            var userPost = await _usersService.GetUserPosts(resolvedUserId.Value);
             var userProfileVM = new GetUserProfileVM()
             {
                 User = user,

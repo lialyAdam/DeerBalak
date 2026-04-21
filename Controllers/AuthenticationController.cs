@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 
 namespace Deerbalak.Controllers
@@ -15,13 +16,17 @@ namespace Deerbalak.Controllers
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
         private readonly RoleManager<IdentityRole<int>> _roleManager;
+        private readonly ILogger<AuthenticationController> _logger;
+
         public AuthenticationController(UserManager<User> userManager,
             SignInManager<User> signInManager,
-            RoleManager<IdentityRole<int>> roleManager)
+            RoleManager<IdentityRole<int>> roleManager,
+            ILogger<AuthenticationController> logger)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _roleManager = roleManager;
+            _logger = logger;
         }
 
         //public async Task<IActionResult> Login()
@@ -36,6 +41,8 @@ namespace Deerbalak.Controllers
         [HttpPost]
         public async Task<IActionResult> Login(LoginVM loginVM)
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
             if (!ModelState.IsValid)
                 return View(loginVM);
 
@@ -49,6 +56,8 @@ namespace Deerbalak.Controllers
             var existingUserClaims = await _userManager.GetClaimsAsync(existingUser);
             if (!existingUserClaims.Any(c => c.Type == CustomClaim.FullName))
                 await _userManager.AddClaimAsync(existingUser, new Claim(CustomClaim.FullName, existingUser.FullName));
+            if (!existingUserClaims.Any(c => c.Type == "ProfilePictureUrl"))
+                await _userManager.AddClaimAsync(existingUser, new Claim("ProfilePictureUrl", existingUser.ProfilePictureUrl ?? ""));
 
             var result = await _signInManager.PasswordSignInAsync(existingUser.UserName, loginVM.Password, false, false);
             if (!result.Succeeded)
@@ -58,7 +67,10 @@ namespace Deerbalak.Controllers
             }
 
             var userRoles = await _userManager.GetRolesAsync(existingUser);
-            await _signInManager.RefreshSignInAsync(existingUser);
+            // Removed RefreshSignInAsync to improve performance
+
+            stopwatch.Stop();
+            _logger.LogInformation($"Login completed in {stopwatch.ElapsedMilliseconds}ms for user {existingUser.Email}");
 
             if (userRoles.Contains(AppRoles.Admin))
                 return RedirectToAction("Index", "Admin");
@@ -107,6 +119,7 @@ namespace Deerbalak.Controllers
 
                 await _userManager.AddToRoleAsync(newUser, AppRoles.User);
                 await _userManager.AddClaimAsync(newUser, new Claim(CustomClaim.FullName, newUser.FullName));
+                await _userManager.AddClaimAsync(newUser, new Claim("ProfilePictureUrl", newUser.ProfilePictureUrl ?? ""));
                 await _signInManager.SignInAsync(newUser, isPersistent: false);
                 return RedirectToAction("Index", "Home");
             }

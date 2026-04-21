@@ -22,24 +22,32 @@ namespace DeerBalak.Controllers
         private readonly IHashtagsService _hashtagsService;
         private readonly IFilesService _filesService;
         private readonly INotificationsService _notificationsService;
+        private readonly FakeNewsDetectionService _fakeNewsService;
+        private readonly ClaimTrackingService _claimTrackingService;
 
         public HomeController(
             ILogger<HomeController> logger,
             IPostsService postsService,
             IHashtagsService hashtagsService,
             IFilesService filesService,
-            INotificationsService notificationsService)
+            INotificationsService notificationsService,
+            FakeNewsDetectionService fakeNewsService,
+            ClaimTrackingService claimTrackingService)
         {
             _logger = logger;
             _postsService = postsService;
             _hashtagsService = hashtagsService;
             _filesService = filesService;
             _notificationsService = notificationsService;
+            _fakeNewsService = fakeNewsService;
+            _claimTrackingService = claimTrackingService;
         }
 
         [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
             var loggedInUserId = GetUserId();
             if (loggedInUserId == null) return RedirectToLogin();
 
@@ -54,16 +62,20 @@ namespace DeerBalak.Controllers
                 TotalPosts = totalPosts
             };
 
+            stopwatch.Stop();
+            _logger.LogInformation($"Home Index loaded in {stopwatch.ElapsedMilliseconds}ms for user {loggedInUserId}");
+
             return View(pagedPosts);
         }
-        public async Task<IActionResult> Details(int postId)
+        public async Task<IActionResult> Details(int? id, int? postId)
         {
-            //var post = await _postsService.GetPostByIdAsync(postId); // ✅ هذا يرجع Post واحد
-            //return View(post);
+            var resolvedPostId = postId ?? id;
+            if (!resolvedPostId.HasValue)
+            {
+                return NotFound();
+            }
 
-            //var post = await _postsService.GetAllPostsAsync(postId);
-            //return View(post);
-            var post = await _postsService.GetPostByIdAsync(postId); // يرجع منشور واحد فقط
+            var post = await _postsService.GetPostByIdAsync(resolvedPostId.Value);
             if (post == null)
             {
                 return NotFound();
@@ -77,6 +89,10 @@ namespace DeerBalak.Controllers
             var loggedInUserId = GetUserId();
             if (loggedInUserId == null) return RedirectToLogin();
 
+            // AI Analysis for fake news detection
+            var analysisResult = await _fakeNewsService.AnalyzePostAsync(post.Content, loggedInUserId.ToString());
+            _logger.LogInformation($"Post analysis: Score {analysisResult.Score}, Label {analysisResult.Label}, Category {analysisResult.Category}");
+
             var imageUploadPath = await _filesService.UploadImageAsync(post.Image, ImageFileType.PostImage);
 
             var newPost = new Post
@@ -86,11 +102,48 @@ namespace DeerBalak.Controllers
                 DateUpdated = DateTime.UtcNow,
                 ImageUrl = imageUploadPath,
                 NrOfReports = 0,
-                UserId = loggedInUserId.Value
+                UserId = loggedInUserId.Value,
+                FakeNewsScore = analysisResult.Score,
+                FakeNewsLabel = analysisResult.Label,
+                FakeNewsCategory = analysisResult.Category,
+                FakeNewsExplanation = analysisResult.Explanation,
+                FakeNewsRecommendedAction = analysisResult.RecommendedAction,
+                // Set claim tracking with initial values
+                AppearedCount = 1,
+                UniqueUsersCount = 1,
+                FirstSeen = DateTime.UtcNow
             };
 
             await _postsService.CreatePostAsync(newPost);
             await _hashtagsService.ProcessHashtagsForNewPostAsync(post.Content);
+
+            // Analyze claim tracking asynchronously (don't block post creation)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var claimTracking = await _claimTrackingService.AnalyzeClaimSpreadAsync(post.Content, newPost.Id);
+                    await _claimTrackingService.UpdatePostClaimTrackingAsync(newPost.Id, claimTracking);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error analyzing claim tracking");
+                }
+            });
+
+            // Show analysis result to user if high risk
+            if (analysisResult.Score >= 7)
+            {
+                TempData["FakeNewsAlert"] = $"⚠️ تحذير: {analysisResult.Explanation}. {analysisResult.RecommendedAction}";
+                TempData["FakeNewsScore"] = analysisResult.Score;
+                TempData["FakeNewsLabel"] = analysisResult.Label;
+            }
+            else
+            {
+                // Show success message with analysis type
+                string analysisSource = analysisResult.Score == 0 ? "✅ تم التحقق المحلي" : "✅ تم التحليل بواسطة AI";
+                TempData["SuccessMessage"] = $"{analysisSource} | النتيجة: {analysisResult.Label}";
+            }
 
             return RedirectToAction("Index");
         }
@@ -107,7 +160,7 @@ namespace DeerBalak.Controllers
             var post = await _postsService.GetPostByIdAsync(postUsefulVM.PostId);
 
             if (result.SendNotification && userId != post.UserId)
-                await _notificationsService.AddNewNotificationAsync(post.UserId, NotificationType.Like, userName, postUsefulVM.PostId);
+                await _notificationsService.AddNewNotificationAsync(post.UserId, NotificationType.Like, userName, postUsefulVM.PostId, userId.Value);
 
             return PartialView("Home/_Post", post);
         }
@@ -123,7 +176,7 @@ namespace DeerBalak.Controllers
             var post = await _postsService.GetPostByIdAsync(postFavoriteVM.PostId);
 
             if (result.SendNotification && userId != post.UserId)
-                await _notificationsService.AddNewNotificationAsync(post.UserId, NotificationType.Favorite, userName, postFavoriteVM.PostId);
+                await _notificationsService.AddNewNotificationAsync(post.UserId, NotificationType.Favorite, userName, postFavoriteVM.PostId, userId.Value);
 
             return PartialView("Home/_Post", post);
         }
@@ -159,7 +212,7 @@ namespace DeerBalak.Controllers
             var post = await _postsService.GetPostByIdAsync(postCommentVM.PostId);
 
             if (userId != post.UserId)
-                await _notificationsService.AddNewNotificationAsync(post.UserId, NotificationType.Comment, userName, postCommentVM.PostId);
+                await _notificationsService.AddNewNotificationAsync(post.UserId, NotificationType.Comment, userName, postCommentVM.PostId, userId.Value);
 
             return PartialView("Home/_Post", post);
         }
@@ -170,7 +223,7 @@ namespace DeerBalak.Controllers
             var loggedInUserId = GetUserId();
             if (loggedInUserId == null) return RedirectToLogin();
 
-            await _postsService.ReportPostAsync(postReportVM.PostId, loggedInUserId.Value);
+            await _postsService.ReportPostAsync(postReportVM.PostId, loggedInUserId.Value, postReportVM.Reason);
             return RedirectToAction("Index");
         }
 
@@ -178,7 +231,10 @@ namespace DeerBalak.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RemovePostComment(RemoveCommentVM removeCommentVM)
         {
-            await _postsService.RemovePostCommentAsync(removeCommentVM.CommentId);
+            var loggedInUserId = GetUserId();
+            if (loggedInUserId == null) return RedirectToLogin();
+
+            await _postsService.RemovePostCommentAsync(removeCommentVM.CommentId, loggedInUserId.Value);
             var post = await _postsService.GetPostByIdAsync(removeCommentVM.PostId);
 
             return PartialView("Home/_Post", post);
@@ -187,7 +243,10 @@ namespace DeerBalak.Controllers
         [HttpPost]
         public async Task<IActionResult> PostRemove(PostRemoveVM postRemoveVM)
         {
-            var postRemoved = await _postsService.RemovePostAsync(postRemoveVM.PostId);
+            var loggedInUserId = GetUserId();
+            if (loggedInUserId == null) return RedirectToLogin();
+
+            var postRemoved = await _postsService.RemovePostAsync(postRemoveVM.PostId, loggedInUserId.Value);
             await _hashtagsService.ProcessHashtagsForRemovedPostAsync(postRemoved.Content);
 
             return RedirectToAction("Index");

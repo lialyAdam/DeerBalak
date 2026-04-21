@@ -12,6 +12,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddResponseCaching();
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+});
 
 //Database Configuration
 var dbConnectionString = builder.Configuration.GetConnectionString("Default");
@@ -27,13 +31,26 @@ builder.Services.AddScoped<INotificationsService, NotificationsService>();
 builder.Services.AddScoped<IPostsService, PostsService>();
 builder.Services.AddScoped<IHashtagsService, HashtagsService>();
 builder.Services.AddScoped<IStoriesService, StoriesService>();
+//builder.Services.AddScoped<IPostsServiceDetector, PostsServiceDetector>();
 
 // Fake news detection support
-builder.Services.AddSingleton<FakeNewsService>();
+builder.Services.AddMemoryCache();
+
+// Configure HttpClient for FakeNewsDetectionService with proper timeout and retry policy
+builder.Services
+    .AddHttpClient<FakeNewsDetectionService>()
+    .ConfigureHttpClient(client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(30);
+    });
+
+// Core detection services from Data project
 builder.Services.AddSingleton<TextProcessor>();
-builder.Services.AddSingleton<SimilarityService>();
-builder.Services.AddSingleton<AIService>();
-builder.Services.AddSingleton<HybridDetector>();
+builder.Services.AddSingleton<ISimilarityService, SimilarityService>();
+builder.Services.AddScoped<IAIService, AIService>();
+builder.Services.AddScoped<FakeNewsService>();
+builder.Services.AddScoped<IHybridDetector, HybridDetector>();
+builder.Services.AddScoped<ClaimTrackingService>();
 
 // ✅ Fallback to LocalFilesService if blob connection string is missing, empty, or placeholder
 // For development, always use LocalFilesService to avoid Azurite setup issues
@@ -107,7 +124,16 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseResponseCompression();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.Append(
+            "Cache-Control",
+            "public,max-age=604800,immutable");
+    }
+});
 app.UseResponseCaching();
 
 app.UseRouting();

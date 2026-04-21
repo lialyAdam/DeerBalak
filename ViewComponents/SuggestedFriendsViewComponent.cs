@@ -21,13 +21,15 @@ namespace DeerBalak.ViewComponents
 
             var suggestedFriends = await _friendsService.GetSuggestedFriendsAsync(userId, 5);
 
-            var suggestedFriendsVM = suggestedFriends.Select(n => new UserWithFriendsCountVM()
-            {
-                UserId = n.User.Id,
-                FullName = n.User.FullName,
-                ProfilePictureUrl = n.User.ProfilePictureUrl,
-                FriendsCount = n.FriendsCount
-            }).ToList();
+            var suggestedFriendsVM = suggestedFriends
+                .Take(5)
+                .Select(n => new UserWithFriendsCountVM()
+                {
+                    UserId = n.User.Id,
+                    FullName = n.User.FullName,
+                    ProfilePictureUrl = n.User.ProfilePictureUrl,
+                    FriendsCount = n.FriendsCount
+                }).ToList();
 
             return View(suggestedFriendsVM);
         }

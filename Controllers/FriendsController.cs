@@ -46,7 +46,7 @@ namespace DeerBalak.Controllers
 
             await _friendsService.SendRequestAsync(userId.Value, receiverId);
 
-            await _notificationsService.AddNewNotificationAsync(receiverId, NotificationType.FriendRequest, userName, null);
+            await _notificationsService.AddNewNotificationAsync(receiverId, NotificationType.FriendRequest, userName, null, userId.Value);
 
             return RedirectToAction("Index", "Home");
         }
@@ -60,8 +60,14 @@ namespace DeerBalak.Controllers
 
             var request = await _friendsService.UpdateRequestAsync(requestId, status);
 
+            if (request == null)
+            {
+                // Handle case where request not found
+                return NotFound("Friend request not found.");
+            }
+
             if (status == FriendshipStatus.Accepted)
-                await _notificationsService.AddNewNotificationAsync(request.SenderId, NotificationType.FriendRequestApproved, userName, null);
+                await _notificationsService.AddNewNotificationAsync(request.SenderId, NotificationType.FriendRequestApproved, userName, null, userId.Value);
 
             return RedirectToAction("Index");
         }
