@@ -15,6 +15,7 @@ namespace Deerbalak.Data.Services
         private readonly ILogger<FakeNewsDetectionService> _logger;
         private readonly IMemoryCache _cache;
         private readonly ClaimTrackingService? _claimTrackingService;
+        private readonly IAIService? _aiService;
         
         // Rate limiting: max 10 requests per minute
         private static readonly SemaphoreSlim _requestThrottle = new SemaphoreSlim(10, 10);
@@ -97,13 +98,15 @@ RETURN ONLY JSON.
             IConfiguration configuration,
             ILogger<FakeNewsDetectionService> logger,
             IMemoryCache cache,
-            ClaimTrackingService? claimTrackingService = null)
+            ClaimTrackingService? claimTrackingService = null,
+            IAIService? aiService = null)
         {
             _httpClient = httpClient;
             _configuration = configuration;
             _logger = logger;
             _cache = cache;
             _claimTrackingService = claimTrackingService;
+            _aiService = aiService;
             
             // Configure HttpClient timeouts
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
@@ -111,237 +114,19 @@ RETURN ONLY JSON.
 
         public async Task<FakeNewsAnalysisResult> AnalyzePostAsync(string postContent, string? userId = null, int postId = 0)
         {
-            // Check cache first - THIS IS THE MOST IMPORTANT PART
+            // Check cache first
             var cacheKey = $"FakeNewsAnalysis_{postContent.GetHashCode()}";
             if (_cache.TryGetValue(cacheKey, out FakeNewsAnalysisResult? cachedResult))
             {
-                _logger.LogInformation("✅ Returning cached AI analysis result (no API call)");
+                _logger.LogInformation("✅ Returning cached analysis result");
                 return cachedResult!;
             }
 
-            // Get repetition count from claim tracking
-            int repetitionCount = 0;
-            if (_claimTrackingService != null)
+            // Get claim tracking data for context
+            var claimTracking = new ClaimTracking
             {
-                try
-                {
-                    var trackingResult = await _claimTrackingService.AnalyzeClaimSpreadAsync(postContent, postId);
-                    repetitionCount = trackingResult.SimilarClaimsCount;
-                    _logger.LogInformation($"📊 Repetition count: {repetitionCount}");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Could not fetch claim tracking data for repetition count");
-                }
-            }
-
-            try
-            {
-                var openAiApiKey = _configuration["OpenAI:ApiKey"];
-                if (string.IsNullOrEmpty(openAiApiKey) || openAiApiKey.StartsWith("YOUR_"))
-                {
-                    _logger.LogWarning("❌ OpenAI API key not configured or invalid");
-                    return await GetFallbackResultWithClaimTrackingAsync(postContent, postId);
-                }
-
-                // Apply rate limiting BEFORE making the API call
-                _logger.LogInformation("🔵 Waiting for throttle slot before calling API...");
-                bool throttleAcquired = await _requestThrottle.WaitAsync(TimeSpan.FromSeconds(5));
-                
-                if (!throttleAcquired)
-                {
-                    _logger.LogWarning("⏱️ Rate limit reached, returning fallback result");
-                    return await GetFallbackResultWithClaimTrackingAsync(postContent, postId);
-                }
-
-                try
-                {
-                    var prompt = string.Format(PromptTemplate, postContent.Trim(), repetitionCount);
-
-                    var requestBody = new
-                    {
-                        model = "gpt-3.5-turbo",  // Using cheaper model as fallback
-                        messages = new[]
-                        {
-                            new { role = "user", content = prompt }
-                        },
-                        max_tokens = 1000,
-                        temperature = 0.3
-                    };
-
-                    var json = JsonSerializer.Serialize(requestBody);
-                    var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                    // Clear previous headers and set new ones
-                    _httpClient.DefaultRequestHeaders.Clear();
-                    _httpClient.DefaultRequestHeaders.Authorization =
-                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", openAiApiKey);
-                    _httpClient.DefaultRequestHeaders.Add("User-Agent", "DeerBalak-AI-Detection/1.0");
-
-                    _logger.LogInformation("📤 Sending request to OpenAI API...");
-                    
-                    // Retry logic with exponential backoff
-                    int maxRetries = 2;
-                    int retryCount = 0;
-                    HttpResponseMessage? response = null;
-
-                    while (retryCount < maxRetries)
-                    {
-                        try
-                        {
-                            response = await _httpClient.PostAsync("https://api.openai.com/v1/chat/completions", content);
-                            
-                            // If successful, break the loop
-                            if (response.IsSuccessStatusCode)
-                            {
-                                _logger.LogInformation($"✅ OpenAI API responded successfully (attempt {retryCount + 1})");
-                                break;
-                            }
-                            
-                            // If 429 (Too Many Requests), wait and retry
-                            if ((int)response.StatusCode == 429)
-                            {
-                                retryCount++;
-                                if (retryCount < maxRetries)
-                                {
-                                    int delayMs = (int)Math.Pow(2, retryCount) * 1000; // Exponential backoff
-                                    _logger.LogWarning($"⏱️ Got 429 - Rate limited. Waiting {delayMs}ms before retry {retryCount}/{maxRetries}...");
-                                    await Task.Delay(delayMs);
-                                    continue;
-                                }
-                            }
-                            // For other errors, break immediately
-                            else
-                            {
-                                break;
-                            }
-                        }
-                        catch (TaskCanceledException ex)
-                        {
-                            _logger.LogError($"⏱️ Request timeout: {ex.Message}");
-                            break;
-                        }
-                    }
-
-                    if (response == null || !response.IsSuccessStatusCode)
-                    {
-                        string errorMsg = response != null 
-                            ? $"{(int)response.StatusCode} - {response.ReasonPhrase}"
-                            : "No response";
-                        _logger.LogError($"❌ OpenAI API error: {errorMsg}");
-                        return await GetFallbackResultWithClaimTrackingAsync(postContent, postId);
-                    }
-
-                    var responseJson = await response.Content.ReadAsStringAsync();
-                    _logger.LogInformation($"📥 Received response from OpenAI (length: {responseJson.Length})");
-                    
-                    try
-                    {
-                        var openAiResponse = JsonSerializer.Deserialize<OpenAiResponse>(responseJson);
-
-                        if (openAiResponse?.Choices?.Length > 0)
-                        {
-                            var analysisJson = openAiResponse.Choices[0].Message?.Content;
-                            if (analysisJson != null)
-                            {
-                                _logger.LogInformation($"📊 AI response: {analysisJson.Substring(0, Math.Min(100, analysisJson.Length))}...");
-                                
-                                var aiResult = JsonSerializer.Deserialize<AiAnalysisResult>(analysisJson);
-
-                            if (aiResult != null)
-                            {
-                                _logger.LogInformation($"✅ AI analysis completed - Score: {aiResult.Score}, Label: {aiResult.Label}");
-
-                                // Get claim tracking information
-                                var claimTracking = new ClaimTracking 
-                                { 
-                                    IsRepeatedClaim = repetitionCount > 0, 
-                                    SimilarClaimsCount = repetitionCount, 
-                                    SpreadLevel = GetSpreadLevel(repetitionCount),
-                                    FirstSeen = null
-                                };
-
-                                if (_claimTrackingService != null)
-                                {
-                                    try
-                                    {
-                                        var trackingResult = await _claimTrackingService.AnalyzeClaimSpreadAsync(postContent, postId);
-                                        if (trackingResult != null)
-                                        {
-                                            claimTracking.FirstSeen = trackingResult.FirstSeenDate.ToString("MMM dd, yyyy");
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        _logger.LogWarning(ex, "Could not fetch detailed claim tracking data");
-                                    }
-                                }
-
-                                var result = new FakeNewsAnalysisResult
-                                {
-                                    Score = aiResult.Score,
-                                    Label = aiResult.Label,
-                                    Confidence = aiResult.Confidence,
-                                    Category = aiResult.Category,
-                                    Explanation = aiResult.Explanation,
-                                    Suggestions = aiResult.Suggestions,
-                                    ClaimTracking = claimTracking,
-                                    RecommendedAction = GetRecommendedAction(aiResult.Score)
-                                };
-
-                                // Cache the result for 24 hours
-                                _cache.Set(cacheKey, result, TimeSpan.FromHours(24));
-
-                                return result;
-                            }
-                        }
-                    }}
-                    catch (JsonException ex)
-                    {
-                        _logger.LogError($"❌ Failed to parse AI response: {ex.Message}");
-                        _logger.LogError($"Response was: {responseJson}");
-                    }
-
-                    return await GetFallbackResultWithClaimTrackingAsync(postContent, postId);
-                }
-                finally
-                {
-                    // Release the throttle slot
-                    _requestThrottle.Release();
-                    _logger.LogInformation("🟢 Released throttle slot");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ Error analyzing post with AI");
-                return await GetFallbackResultWithClaimTrackingAsync(postContent, postId);
-            }
-        }
-
-        private string GetSpreadLevel(int repetitionCount)
-        {
-            if (repetitionCount >= 10) return "VIRAL";
-            if (repetitionCount >= 6) return "HIGH";
-            if (repetitionCount >= 3) return "MEDIUM";
-            return "LOW";
-        }
-
-        private string GetRecommendedAction(int score)
-        {
-            if (score <= 2) return "Safe to share";
-            if (score <= 4) return "Be cautious";
-            if (score <= 6) return "Verify sources";
-            if (score <= 8) return "Do not share";
-            return "Report immediately";
-        }
-
-        private async Task<FakeNewsAnalysisResult> GetFallbackResultWithClaimTrackingAsync(string postContent, int postId = 0)
-        {
-            // Get claim tracking information from database
-            var claimTracking = new ClaimTracking 
-            { 
-                IsRepeatedClaim = false, 
-                SimilarClaimsCount = 0, 
+                IsRepeatedClaim = false,
+                SimilarClaimsCount = 0,
                 SpreadLevel = "LOW",
                 FirstSeen = null
             };
@@ -362,21 +147,121 @@ RETURN ONLY JSON.
                 }
             }
 
-            return new FakeNewsAnalysisResult
+            // Use the enhanced AI service
+            if (_aiService != null)
             {
-                Score = 0,
-                Label = "SAFE",
-                Confidence = 50,
-                Category = "Other",
-                Explanation = "✅ AI analysis unavailable - using local verification based on claim tracking",
-                Suggestions = new[] 
-                { 
-                    "📊 See claim tracking info below to understand spread pattern",
-                    "🔍 Consider verifying information from credible sources"
-                },
+                try
+                {
+                    var aiResult = await _aiService.AnalyzeTextAsync(postContent);
+
+                    var result = new FakeNewsAnalysisResult
+                    {
+                        Score = aiResult.risk_score,
+                        Label = aiResult.label,
+                        Confidence = aiResult.confidence,
+                        Category = aiResult.category,
+                        Explanation = aiResult.explanation,
+                        Suggestions = new[] { aiResult.recommended_action },
+                        ClaimTracking = claimTracking,
+                        RecommendedAction = aiResult.recommended_action,
+                        Mode = aiResult.mode,
+                        Flags = aiResult.flags?.ToArray()
+                    };
+
+                    // Cache the result
+                    _cache.Set(cacheKey, result, TimeSpan.FromHours(24));
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "AI service failed, using fallback");
+                }
+            }
+
+            // Fallback to basic analysis
+            return await GetBasicFallbackResultAsync(postContent, claimTracking, cacheKey);
+        }
+
+        private string GetSpreadLevel(int repetitionCount)
+        {
+            if (repetitionCount >= 10) return "VIRAL";
+            if (repetitionCount >= 6) return "HIGH";
+            if (repetitionCount >= 3) return "MEDIUM";
+            return "LOW";
+        }
+
+        private string GetRecommendedAction(int score)
+        {
+            if (score <= 2) return "Safe to share";
+            if (score <= 4) return "Be cautious";
+            if (score <= 6) return "Verify sources";
+            if (score <= 8) return "Do not share";
+            return "Report immediately";
+        }
+
+        private async Task<FakeNewsAnalysisResult> GetBasicFallbackResultAsync(string postContent, ClaimTracking claimTracking, string cacheKey)
+        {
+            // Basic keyword analysis
+            int score = 0;
+            var flags = new List<string>();
+            var analysis = new List<string>();
+
+            var lowerText = postContent.ToLower();
+
+            // Danger keywords (+2)
+            if (lowerText.Contains("danger") || lowerText.Contains("urgent") || lowerText.Contains("evacuate") ||
+                lowerText.Contains("disaster") || lowerText.Contains("emergency"))
+            {
+                score += 2;
+                flags.Add("urgent");
+                analysis.Add("Urgent/danger keywords detected");
+            }
+
+            // Unreliable language (+1)
+            if (lowerText.Contains("i heard") || lowerText.Contains("people say") || lowerText.Contains("maybe") ||
+                lowerText.Contains("not sure") || lowerText.Contains("rumor"))
+            {
+                score += 1;
+                flags.Add("uncertain");
+                analysis.Add("Uncertain language detected");
+            }
+
+            // Official language (-2)
+            if (lowerText.Contains("official") || lowerText.Contains("confirmed") || lowerText.Contains("announced"))
+            {
+                score = Math.Max(0, score - 2);
+                flags.Add("official");
+                analysis.Add("Official/confirmed language detected");
+            }
+
+            // Repetition impact
+            if (claimTracking.SimilarClaimsCount >= 3)
+            {
+                score += 1;
+                flags.Add("repeated");
+                analysis.Add($"High repetition ({claimTracking.SimilarClaimsCount} similar posts)");
+            }
+
+            // Clamp score
+            score = Math.Clamp(score, 0, 10);
+
+            var result = new FakeNewsAnalysisResult
+            {
+                Score = score,
+                Label = score >= 7 ? "CRITICAL" : score >= 4 ? "HIGH" : score >= 2 ? "MEDIUM" : "LOW",
+                Confidence = 60,
+                Category = "General",
+                Explanation = "Local analysis completed with claim tracking",
+                Suggestions = new[] { "Verify information from credible sources" },
                 ClaimTracking = claimTracking,
-                RecommendedAction = "Safe to share"
+                RecommendedAction = score >= 7 ? "Do not share" : score >= 2 ? "Be cautious" : "Safe to share",
+                Mode = "FALLBACK",
+                Flags = flags.ToArray()
             };
+
+            // Cache the result
+            _cache.Set(cacheKey, result, TimeSpan.FromHours(24));
+            return result;
         }
     }
 
@@ -400,6 +285,8 @@ RETURN ONLY JSON.
         public string[]? Suggestions { get; set; }
         public ClaimTracking? ClaimTracking { get; set; }
         public string? RecommendedAction { get; set; }
+        public string? Mode { get; set; } = "AI";
+        public string[]? Flags { get; set; }
     }
 
     public class ClaimTracking

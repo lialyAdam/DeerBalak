@@ -190,6 +190,44 @@
         </div>
     }
 
+    @* New UI improvements: Contradiction and repetition warnings *@
+    @if (Model.AppearedCount > 1 && Model.FakeNewsScore >= 4)
+    {
+        <div class="bg-orange-50 border border-orange-200 text-orange-700 px-4 py-3 rounded-xl mb-3 font-semibold">
+            ⚠️ Conflicting reports detected - Multiple contradictory claims about this topic
+        </div>
+    }
+
+    @if (Model.AppearedCount >= 3)
+    {
+        <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-3 font-semibold">
+            📡 This claim is spreading rapidly (@Model.AppearedCount similar posts)
+        </div>
+    }
+
+    @* Fallback mode indicator *@
+    @if (Model.FakeNewsMode == "FALLBACK")
+    {
+        <div class="bg-gray-50 border border-gray-200 text-gray-700 px-4 py-3 rounded-xl mb-3 font-semibold">
+            ⚙️ AI unavailable - using local analysis
+        </div>
+    }
+
+    @* Flags display *@
+    @if (!string.IsNullOrEmpty(Model.FakeNewsFlags))
+    {
+        var flags = Model.FakeNewsFlags.Split(',');
+        if (flags.Length > 0)
+        {
+            <div class="flex flex-wrap gap-2 mb-3">
+                @foreach (var flag in flags)
+                {
+                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">@flag</span>
+                }
+            </div>
+        }
+    }
+
     <a asp-controller="Home" asp-action="Details" asp-route-postId="@Model.Id">
         <div class="sm:px-3 p-2.5 pt-0 w-full">
             <p class="font-normal post-content" data-content="@Model.Content">

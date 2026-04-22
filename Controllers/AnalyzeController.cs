@@ -32,7 +32,7 @@ namespace Deerbalak.Controllers
 
             var result = await _aiService.AnalyzeTextAsync(request.Text);
             
-            Console.WriteLine($"✅ [AnalyzeController] Returning result: Score={result.Score}, Label={result.Label}, Confidence={result.Confidence}");
+            Console.WriteLine($"✅ [AnalyzeController] Returning result: RiskScore={result.risk_score}, Label={result.label}, Confidence={result.confidence}, Mode={result.mode}");
             
             return Ok(result);
         }

@@ -44,7 +44,7 @@ namespace DeerBalak.Controllers
         }
 
         [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any)]
-        public async Task<IActionResult> Index(int page = 1, int pageSize = 10)
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 50)
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -53,6 +53,8 @@ namespace DeerBalak.Controllers
 
             var posts = await _postsService.GetFeedAsync(loggedInUserId.Value, page, pageSize);
             var totalPosts = await _postsService.GetTotalPostsCountAsync(loggedInUserId.Value);
+
+            Console.WriteLine($"🔍 DEBUG: Retrieved {posts.Count} posts out of {totalPosts} total posts (page {page}, size {pageSize})");
 
             var pagedPosts = new PagedPostsVM
             {
@@ -108,6 +110,8 @@ namespace DeerBalak.Controllers
                 FakeNewsCategory = analysisResult.Category,
                 FakeNewsExplanation = analysisResult.Explanation,
                 FakeNewsRecommendedAction = analysisResult.RecommendedAction,
+                FakeNewsMode = analysisResult.Mode,
+                FakeNewsFlags = analysisResult.Flags != null ? string.Join(",", analysisResult.Flags) : null,
                 // Set claim tracking with initial values
                 AppearedCount = 1,
                 UniqueUsersCount = 1,

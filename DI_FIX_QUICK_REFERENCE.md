@@ -193,7 +193,7 @@ public class AIService : IAIService
 ```csharp
 public interface IAIService
 {
-    Task<AIDetectionResult> AnalyzeTextAsync(string text);
+    Task<SafetyReport> AnalyzeTextAsync(string text, List<string>? previousClaims = null);
 }
 ```
 
