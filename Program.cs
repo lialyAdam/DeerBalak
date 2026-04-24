@@ -6,8 +6,12 @@ using Deerbalak.Data.Hubs;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using DeerBalak.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add environment variables support for secure API keys
+builder.Configuration.AddEnvironmentVariables();
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -16,6 +20,7 @@ builder.Services.AddResponseCompression(options =>
 {
     options.EnableForHttps = true;
 });
+
 
 //Database Configuration
 var dbConnectionString = builder.Configuration.GetConnectionString("Default");
@@ -51,6 +56,9 @@ builder.Services.AddScoped<IAIService, AIService>();
 builder.Services.AddScoped<FakeNewsService>();
 builder.Services.AddScoped<IHybridDetector, HybridDetector>();
 builder.Services.AddScoped<ClaimTrackingService>();
+
+// OpenAI integration service
+builder.Services.AddScoped<IOpenAIService, OpenAIService>();
 
 // ✅ Fallback to LocalFilesService if blob connection string is missing, empty, or placeholder
 // For development, always use LocalFilesService to avoid Azurite setup issues

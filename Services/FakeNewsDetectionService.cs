@@ -199,7 +199,7 @@ RETURN ONLY JSON.
             return "Report immediately";
         }
 
-        private async Task<FakeNewsAnalysisResult> GetBasicFallbackResultAsync(string postContent, ClaimTracking claimTracking, string cacheKey)
+        private Task<FakeNewsAnalysisResult> GetBasicFallbackResultAsync(string postContent, ClaimTracking claimTracking, string cacheKey)
         {
             // Basic keyword analysis
             int score = 0;
@@ -261,7 +261,7 @@ RETURN ONLY JSON.
 
             // Cache the result
             _cache.Set(cacheKey, result, TimeSpan.FromHours(24));
-            return result;
+            return Task.FromResult(result);
         }
     }
 

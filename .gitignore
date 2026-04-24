@@ -36,6 +36,7 @@ bld/
 appsettings.Development.json
 *.Development.json
 user-secrets.json
+.env
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
