@@ -40,14 +40,14 @@
 
         <div id="notification-dropdown" class="hidden absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-xl shadow-xl border border-gray-200 z-50"></div>
 
-        <div class="rounded-full relative cursor-pointer">
+        <div class="rounded-full relative cursor-pointer" id="profileBtn">
             <img loading="lazy" 
                  decoding="async"
                  src="@(string.IsNullOrEmpty(profilePictureUrl) ? Url.Content("~/images/avatar/user.png") : profilePictureUrl)" 
                  class="w-9 h-9 rounded-full shadow" />
         </div>
 
-        <div class="hidden bg-white rounded-lg drop-shadow-xl w-64 border border-gray-200" uk-drop="offset:6;pos: bottom-right; animate-out: true;">
+        <div id="profile-dropdown" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-lg drop-shadow-xl border border-gray-200 z-50">
             <a>
                 <div class="p-4 py-5 flex items-center gap-4">
                     <img loading="lazy" 
@@ -121,8 +121,10 @@
 
         if (notificationsBtn && notificationDropdown) {
             console.log('Setting up notification button event listener');
-            notificationsBtn.addEventListener('click', () => {
+            notificationsBtn.addEventListener('click', (e) => {
                 console.log('Notifications button clicked');
+                e.preventDefault();
+                e.stopPropagation();
                 if (!notificationDropdown.classList.contains('hidden')) {
                     notificationDropdown.classList.add('hidden');
                     return;
@@ -142,6 +144,30 @@
             document.addEventListener('click', (event) => {
                 if (!notificationDropdown.classList.contains('hidden') && !notificationDropdown.contains(event.target) && !notificationsBtn.contains(event.target)) {
                     notificationDropdown.classList.add('hidden');
+                }
+            });
+        }
+
+        // Setup profile button event listener
+        const profileDropdown = document.getElementById('profile-dropdown');
+        const profileBtn = document.getElementById('profileBtn');
+
+        if (profileBtn && profileDropdown) {
+            console.log('Setting up profile button event listener');
+            profileBtn.addEventListener('click', (e) => {
+                console.log('Profile button clicked');
+                e.preventDefault();
+                e.stopPropagation();
+                if (!profileDropdown.classList.contains('hidden')) {
+                    profileDropdown.classList.add('hidden');
+                    return;
+                }
+                profileDropdown.classList.remove('hidden');
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!profileDropdown.classList.contains('hidden') && !profileDropdown.contains(event.target) && !profileBtn.contains(event.target)) {
+                    profileDropdown.classList.add('hidden');
                 }
             });
         }

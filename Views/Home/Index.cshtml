@@ -77,7 +77,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        document.getElementById('posts-container').addEventListener('click', function () {
+        document.getElementById('posts-container').addEventListener('click', function (event) {
 
             const button = event.target.closest('.Useful-button, .favorite-button')
             if (button) {
@@ -100,7 +100,7 @@
             }
         });
 
-        document.getElementById('posts-container').addEventListener('submit', function () {
+        document.getElementById('posts-container').addEventListener('submit', function (event) {
 
             var form = event.target;
 

@@ -43,6 +43,32 @@
     <script src="~/js/simplebar.js"></script>
     <script src="~/js/script.js"></script>
 
+    <script>
+        // Ensure all modals are closed on page load and clean up any stuck overlays
+        document.addEventListener('DOMContentLoaded', function() {
+            // Close any stuck UIKit modals
+            document.querySelectorAll('.uk-modal.uk-open').forEach(modal => {
+                UIkit.modal(modal).hide();
+            });
+            
+            // Ensure sidebar is closed on page load
+            const sidebar = document.getElementById('site__sidebar');
+            if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.add('-translate-x-full');
+            }
+            
+            // Remove any stuck modal overlays
+            document.querySelectorAll('.uk-modal-page').forEach(overlay => {
+                overlay.remove();
+            });
+            
+            // Ensure body doesn't have modal classes
+            document.body.classList.remove('uk-modal-page');
+            
+            console.log('Modal cleanup completed');
+        });
+    </script>
+
 
    @* Ion Icon *@
    
