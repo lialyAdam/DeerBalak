@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using OpenAI.Chat;
 
 namespace DeerBalak.Services
@@ -10,7 +11,7 @@ namespace DeerBalak.Services
 
     public sealed class OpenAIService : IOpenAIService
     {
-        private const int MaxRiskScore = 5;
+        private const int MaxRiskScore = 10;
         private const int MaxConfidence = 100;
         private const int MinConfidence = 20;
         private readonly bool _isEnabled;
@@ -100,22 +101,33 @@ namespace DeerBalak.Services
 
         private async Task<AiAnalysisResult> AnalyzeWithOpenAIAsync(string text)
         {
-            const string prompt = @"You are a misinformation detection expert. Analyze the following social media post for potential misinformation, fake news, or harmful content.
+            const string prompt = @"You are an advanced misinformation detection AI.
 
-Return a JSON response with this exact structure:
+Analyze the following social media post and return a structured risk assessment.
+
+STRICT RULES:
+- DO NOT default to SAFE when information is uncertain.
+- Detect urgency, fear, exaggeration, vague claims, and lack of evidence.
+- Repeated claims DO NOT automatically mean SAFE — they can increase misinformation risk.
+- If the claim contains warnings without proof → increase risk.
+- If the claim uses words like ""danger"", ""urgent"", ""everyone"", ""evacuate"" → HIGH risk.
+- If the claim is vague like ""people are saying"" → MEDIUM risk.
+- If the claim is neutral and factual → LOW risk.
+
+RISK SCORING:
+0–3 → SAFE
+4–7 → MEDIUM
+8–10 → CRITICAL
+
+OUTPUT FORMAT (STRICT JSON):
 {
-  ""riskScore"": number (0-5, where 0=no risk, 5=extremely high risk),
-  ""confidence"": number (0-100, your confidence in this assessment),
-  ""category"": ""string (Fake News|Misinformation|Safety|Political|Medical|Spam|Normal)"",
-  ""flags"": [""array of strings like: 'sensational', 'unverified', 'emotional', 'urgent', 'political'"",
-  ""explanation"": ""brief explanation of your analysis""
+  ""risk_score"": number (0–10),
+  ""risk_level"": ""SAFE"" | ""MEDIUM"" | ""CRITICAL"",
+  ""confidence"": number (0–100),
+  ""main_signals"": [""signal1"", ""signal2""],
+  ""why_flagged"": ""short explanation"",
+  ""recommended_action"": ""SAFE_TO_SHARE"" | ""VERIFY_FIRST"" | ""DO_NOT_SHARE""
 }
-
-Consider:
-- Sensational language, urgency, emotional appeals
-- Unverified claims, conspiracy theories
-- Harmful misinformation about health, safety, politics
-- Spam or manipulative content
 
 Post to analyze: ";
 
@@ -222,7 +234,7 @@ Post to analyze: ";
                           flags.Contains("urgent") ? "Alert" :
                           flags.Contains("uncertain") ? "Uncertain" : "General";
 
-            var confidence = MinConfidence + riskScore * 12; // Scale confidence with risk score
+            var confidence = MinConfidence + riskScore * 8; // Scale confidence with risk score
             confidence = Math.Clamp(confidence, MinConfidence, MaxConfidence);
 
             return new AiAnalysisResult
@@ -230,7 +242,11 @@ Post to analyze: ";
                 RiskScore = riskScore,
                 Confidence = confidence,
                 Category = category,
+                MainSignals = flags.ToList(),
                 Flags = flags,
+                WhyFlagged = flags.Any() ? string.Join(", ", flags) : "No risk signals detected.",
+                RiskLevel = GetRiskLevel(riskScore),
+                RecommendedAction = GetRecommendedAction(riskScore),
                 Explanation = BuildFallbackExplanation(riskScore, flags)
             };
         }
@@ -238,6 +254,20 @@ Post to analyze: ";
         private static bool ContainsAny(string source, params string[] terms)
         {
             return terms.Any(term => source.Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string GetRiskLevel(int score)
+        {
+            if (score <= 3) return "SAFE";
+            if (score <= 7) return "MEDIUM";
+            return "CRITICAL";
+        }
+
+        private static string GetRecommendedAction(int score)
+        {
+            if (score <= 3) return "SAFE_TO_SHARE";
+            if (score <= 7) return "VERIFY_FIRST";
+            return "DO_NOT_SHARE";
         }
 
         private static string BuildFallbackExplanation(int riskScore, IReadOnlyCollection<string> flags)
@@ -254,8 +284,24 @@ Post to analyze: ";
 
     public sealed class AiAnalysisResult
     {
+        [JsonPropertyName("risk_score")]
         public int RiskScore { get; set; }
+
+        [JsonPropertyName("risk_level")]
+        public string RiskLevel { get; set; } = string.Empty;
+
+        [JsonPropertyName("confidence")]
         public int Confidence { get; set; }
+
+        [JsonPropertyName("main_signals")]
+        public List<string> MainSignals { get; set; } = new();
+
+        [JsonPropertyName("why_flagged")]
+        public string WhyFlagged { get; set; } = string.Empty;
+
+        [JsonPropertyName("recommended_action")]
+        public string RecommendedAction { get; set; } = string.Empty;
+
         public string Category { get; set; } = string.Empty;
         public List<string> Flags { get; set; } = new();
         public string Explanation { get; set; } = string.Empty;
