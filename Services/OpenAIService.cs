@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using OpenAI.Chat;
 
 namespace DeerBalak.Services
@@ -64,19 +65,25 @@ namespace DeerBalak.Services
             if (string.IsNullOrWhiteSpace(text))
             {
                 _logger.LogDebug("Empty text provided, using fallback analysis");
-                return AnalyzeWithRules(string.Empty);
+                var res = AnalyzeWithRules(string.Empty);
+                RiskAssessmentService.Normalize(res, lowConfidenceMode: false);
+                return res;
             }
 
             if (!_isEnabled)
             {
                 _logger.LogWarning("⚠️ OpenAI integration is disabled by configuration. Using local fallback.");
-                return AnalyzeWithRules(text);
+                var res = AnalyzeWithRules(text);
+                RiskAssessmentService.Normalize(res, lowConfidenceMode: true);
+                return res;
             }
 
             if (_chatClient == null)
             {
                 _logger.LogWarning("⚠️ OpenAI client not available. Using fallback analysis.");
-                return AnalyzeWithRules(text);
+                var res = AnalyzeWithRules(text);
+                RiskAssessmentService.Normalize(res, lowConfidenceMode: true);
+                return res;
             }
 
             try
@@ -86,6 +93,9 @@ namespace DeerBalak.Services
                 var result = await AnalyzeWithOpenAIAsync(text);
                 _logger.LogInformation("✅ OpenAI analysis completed: RiskScore={RiskScore}, Confidence={Confidence}%",
                     result.RiskScore, result.Confidence);
+
+                // Normalize final output to enforce single-source-of-truth rules
+                RiskAssessmentService.Normalize(result, lowConfidenceMode: false);
                 return result;
             }
             catch (Exception ex)
@@ -93,41 +103,42 @@ namespace DeerBalak.Services
                 Console.WriteLine("ERROR: " + ex.Message);
                 Console.WriteLine("StackTrace: " + ex.StackTrace);
                 _logger.LogError(ex, "❌ OpenAI API call failed: {Message}. Using fallback analysis.", ex.Message);
-                // Temporarily throw to see the error
-                throw;
-                // return AnalyzeWithRules(text);
+                var fallback = AnalyzeWithRules(text);
+                RiskAssessmentService.Normalize(fallback, lowConfidenceMode: true);
+                return fallback;
             }
         }
 
         private async Task<AiAnalysisResult> AnalyzeWithOpenAIAsync(string text)
         {
-            const string prompt = @"You are an advanced misinformation detection AI.
+            const string prompt = @"You are a content safety and misinformation detection system for a social feed application.
 
-Analyze the following social media post and return a structured risk assessment.
+Follow these rules strictly and return ONLY a single JSON object (no extra text).
 
-STRICT RULES:
-- DO NOT default to SAFE when information is uncertain.
-- Detect urgency, fear, exaggeration, vague claims, and lack of evidence.
-- Repeated claims DO NOT automatically mean SAFE — they can increase misinformation risk.
-- If the claim contains warnings without proof → increase risk.
-- If the claim uses words like ""danger"", ""urgent"", ""everyone"", ""evacuate"" → HIGH risk.
-- If the claim is vague like ""people are saying"" → MEDIUM risk.
-- If the claim is neutral and factual → LOW risk.
-
-RISK SCORING:
-0–3 → SAFE
-4–7 → MEDIUM
-8–10 → CRITICAL
+1) FINAL DECISION: return exactly ONE of: SAFE, LOW RISK, MEDIUM RISK, HIGH RISK, CRITICAL.
+2) NO CONTRADICTIONS: risk_level, recommendation, and status must all align with the single final decision.
+3) CONFIDENCE: Represents certainty (0-100) only and must NOT change the risk level.
+4) REPETITION SIGNAL: 'appeared X times' is a weak signal — it may slightly adjust score but cannot alone cause CRITICAL.
+5) AI UNAVAILABLE: if AI is unavailable, add flag 'low_confidence_mode' and reduce sensitivity by at most one level (do not increase risk).
+6) DEDUPLICATION: treat similar posts conceptually; do not escalate risk solely due to repetition.
+7) CATEGORY: choose ONE of: Traffic, Safety, Emergency, News, General (prefer General over Other).
+8) RECOMMENDATION MAPPING (must match risk level exactly):
+   SAFE => "Content appears safe"
+   LOW RISK => "Minor caution"
+   MEDIUM RISK => "Verify before sharing"
+   HIGH RISK => "Do not share without verification"
+   CRITICAL => "Urgent risk: avoid sharing immediately"
 
 OUTPUT FORMAT (STRICT JSON):
 {
-  ""risk_score"": number (0–10),
-  ""risk_level"": ""SAFE"" | ""MEDIUM"" | ""CRITICAL"",
-  ""confidence"": number (0–100),
-  ""main_signals"": [""signal1"", ""signal2""],
-  ""why_flagged"": ""short explanation"",
-  ""recommended_action"": ""SAFE_TO_SHARE"" | ""VERIFY_FIRST"" | ""DO_NOT_SHARE""
+  ""risk_level"": ""SAFE"" | ""LOW RISK"" | ""MEDIUM RISK"" | ""HIGH RISK"" | ""CRITICAL"",
+  ""confidence"": number (0-100),
+  ""category"": ""Traffic"" | ""Safety"" | ""Emergency"" | ""News"" | ""General"",
+  ""recommendation"": string (use exact mapping above),
+  ""reason"": string (short explanation, optional)
 }
+
+Priority when deciding: 1) content meaning 2) context/intent 3) source consistency 4) repetition (weak) 5) keyword patterns.
 
 Post to analyze: ";
 
@@ -165,6 +176,16 @@ Post to analyze: ";
                     throw new Exception("Failed to deserialize OpenAI response");
                 }
 
+                // Map alias fields if the model used different keys (e.g., "recommendation" / "reason")
+                if (!string.IsNullOrWhiteSpace(result.Recommendation))
+                {
+                    result.RecommendedAction = result.Recommendation;
+                }
+                if (!string.IsNullOrWhiteSpace(result.Reason))
+                {
+                    result.WhyFlagged = result.Reason;
+                }
+
                 // Validate and clamp values
                 result.RiskScore = Math.Clamp(result.RiskScore, 0, MaxRiskScore);
                 result.Confidence = Math.Clamp(result.Confidence, 0, MaxConfidence);
@@ -181,9 +202,18 @@ Post to analyze: ";
 
         private AiAnalysisResult AnalyzeWithRules(string text)
         {
-            var riskScore = 0;
+            double riskScore = 0.0;
             var flags = new List<string>();
             var lowerText = text?.ToLowerInvariant() ?? string.Empty;
+
+            // Detect repetition pattern: "appeared X times" -> small boost up to +0.5
+            var repetitionMatch = Regex.Match(lowerText, @"appeared\s+(\d+)\s+times");
+            if (repetitionMatch.Success && int.TryParse(repetitionMatch.Groups[1].Value, out var repCount))
+            {
+                var boost = Math.Min(0.5, repCount * 0.1); // 0.1 per appearance, capped at 0.5
+                riskScore += boost;
+                flags.Add("repetition");
+            }
 
             // High-risk keywords (+2 points)
             if (ContainsAny(lowerText, "danger", "disaster", "attack", "crisis", "emergency", "evacuate", "bomb", "explosion"))
@@ -228,26 +258,29 @@ Post to analyze: ";
                 flags.Add("all_caps");
             }
 
-            riskScore = Math.Clamp(riskScore, 0, MaxRiskScore);
+            // Clamp internal score and convert to integer output
+            riskScore = Math.Clamp(riskScore, 0.0, MaxRiskScore);
+            var finalScore = (int)Math.Round(riskScore);
 
+            // Category heuristics
             var category = flags.Contains("danger") ? "Safety" :
-                          flags.Contains("urgent") ? "Alert" :
-                          flags.Contains("uncertain") ? "Uncertain" : "General";
+                          flags.Contains("urgent") ? "News" :
+                          flags.Contains("uncertain") ? "News" : "News";
 
-            var confidence = MinConfidence + riskScore * 8; // Scale confidence with risk score
+            var confidence = MinConfidence + finalScore * 8; // Scale confidence with risk score
             confidence = Math.Clamp(confidence, MinConfidence, MaxConfidence);
 
             return new AiAnalysisResult
             {
-                RiskScore = riskScore,
+                RiskScore = finalScore,
                 Confidence = confidence,
                 Category = category,
                 MainSignals = flags.ToList(),
                 Flags = flags,
                 WhyFlagged = flags.Any() ? string.Join(", ", flags) : "No risk signals detected.",
-                RiskLevel = GetRiskLevel(riskScore),
-                RecommendedAction = GetRecommendedAction(riskScore),
-                Explanation = BuildFallbackExplanation(riskScore, flags)
+                RiskLevel = GetRiskLevel(finalScore),
+                RecommendedAction = GetRecommendedAction(finalScore),
+                Explanation = BuildFallbackExplanation(finalScore, flags)
             };
         }
 
@@ -258,16 +291,25 @@ Post to analyze: ";
 
         private static string GetRiskLevel(int score)
         {
-            if (score <= 3) return "SAFE";
-            if (score <= 7) return "MEDIUM";
+            if (score <= 2) return "SAFE";
+            if (score <= 4) return "LOW RISK";
+            if (score <= 6) return "MEDIUM RISK";
+            if (score <= 8) return "HIGH RISK";
             return "CRITICAL";
         }
 
         private static string GetRecommendedAction(int score)
         {
-            if (score <= 3) return "SAFE_TO_SHARE";
-            if (score <= 7) return "VERIFY_FIRST";
-            return "DO_NOT_SHARE";
+            var level = GetRiskLevel(score);
+            return level switch
+            {
+                var s when s.Equals("SAFE", StringComparison.OrdinalIgnoreCase) => "Content appears safe",
+                var s when s.Equals("LOW RISK", StringComparison.OrdinalIgnoreCase) => "Minor caution",
+                var s when s.Equals("MEDIUM RISK", StringComparison.OrdinalIgnoreCase) => "Verify before sharing",
+                var s when s.Equals("HIGH RISK", StringComparison.OrdinalIgnoreCase) => "Do not share",
+                var s when s.Equals("CRITICAL", StringComparison.OrdinalIgnoreCase) => "Urgent: avoid sharing",
+                _ => "Verify before sharing"
+            };
         }
 
         private static string BuildFallbackExplanation(int riskScore, IReadOnlyCollection<string> flags)
@@ -301,6 +343,13 @@ Post to analyze: ";
 
         [JsonPropertyName("recommended_action")]
         public string RecommendedAction { get; set; } = string.Empty;
+
+        // Alias keys the model might return for compatibility with the new prompt
+        [JsonPropertyName("recommendation")]
+        public string Recommendation { get; set; } = string.Empty;
+
+        [JsonPropertyName("reason")]
+        public string Reason { get; set; } = string.Empty;
 
         public string Category { get; set; } = string.Empty;
         public List<string> Flags { get; set; } = new();
