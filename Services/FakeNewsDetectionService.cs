@@ -201,67 +201,183 @@ RETURN ONLY JSON.
 
         private Task<FakeNewsAnalysisResult> GetBasicFallbackResultAsync(string postContent, ClaimTracking claimTracking, string cacheKey)
         {
-            // Basic keyword analysis
+            // Enhanced keyword analysis with intelligent scoring
             int score = 0;
             var flags = new List<string>();
             var analysis = new List<string>();
 
             var lowerText = postContent.ToLower();
+            var hasAllCaps = postContent.Any(char.IsUpper) && postContent.Where(char.IsLetter).Count(char.IsUpper) > postContent.Length / 4;
 
-            // Danger keywords (+2)
-            if (lowerText.Contains("danger") || lowerText.Contains("urgent") || lowerText.Contains("evacuate") ||
-                lowerText.Contains("disaster") || lowerText.Contains("emergency"))
+            // CRITICAL danger keywords (+4 each)
+            var criticalKeywords = new[] { "evacuate", "evacuate now", "everyone evacuate", "immediately evacuate", 
+                                          "stay inside", "everyone stay inside", "bomb", "bombing", "explosion",
+                                          "attack", "under attack", "disaster", "catastrophe", "apocalypse" };
+            foreach (var keyword in criticalKeywords)
             {
-                score += 2;
-                flags.Add("urgent");
-                analysis.Add("Urgent/danger keywords detected");
+                if (lowerText.Contains(keyword))
+                {
+                    score += 4;
+                    flags.Add("critical_danger");
+                    analysis.Add($"Critical alert keyword detected: '{keyword}'");
+                    break; // Count once
+                }
+            }
+
+            // HIGH risk keywords (+3 each)
+            var highRiskKeywords = new[] { "danger", "dangerous", "unsafe", "emergency", "urgent", "immediately",
+                                          "right now", "everyone", "all areas", "must", "critical", "alert",
+                                          "warning", "beware", "avoid", "spread", "panic" };
+            var highRiskCount = 0;
+            foreach (var keyword in highRiskKeywords)
+            {
+                if (lowerText.Contains(keyword))
+                {
+                    highRiskCount++;
+                }
+            }
+            if (highRiskCount > 0)
+            {
+                score += Math.Min(3, highRiskCount); // Up to +3 for multiple risk keywords
+                if (highRiskCount >= 2)
+                {
+                    flags.Add("multiple_risk_signals");
+                    analysis.Add($"Multiple risk signals detected ({highRiskCount} keywords)");
+                }
             }
 
             // Unreliable language (+1)
             if (lowerText.Contains("i heard") || lowerText.Contains("people say") || lowerText.Contains("maybe") ||
-                lowerText.Contains("not sure") || lowerText.Contains("rumor"))
+                lowerText.Contains("not sure") || lowerText.Contains("rumor") || lowerText.Contains("allegedly"))
             {
                 score += 1;
                 flags.Add("uncertain");
-                analysis.Add("Uncertain language detected");
+                analysis.Add("Uncertain/hearsay language detected");
+            }
+
+            // ALL CAPS usage (+2 if combined with other risk factors)
+            if (hasAllCaps && score > 0)
+            {
+                score += 2;
+                flags.Add("all_caps_emphasis");
+                analysis.Add("All-caps emphasis combined with risk keywords");
+            }
+
+            // No credible sources (-1 if risky claim lacks attribution)
+            if (score > 3 && !lowerText.Contains("according to") && !lowerText.Contains("source") && 
+                !lowerText.Contains("confirmed") && !lowerText.Contains("official"))
+            {
+                score += 1;
+                flags.Add("no_sources");
+                analysis.Add("Risky claim without source attribution");
             }
 
             // Official language (-2)
-            if (lowerText.Contains("official") || lowerText.Contains("confirmed") || lowerText.Contains("announced"))
+            if (lowerText.Contains("official") || lowerText.Contains("confirmed") || lowerText.Contains("announced") ||
+                lowerText.Contains("according to official"))
             {
                 score = Math.Max(0, score - 2);
                 flags.Add("official");
                 analysis.Add("Official/confirmed language detected");
             }
 
-            // Repetition impact
-            if (claimTracking.SimilarClaimsCount >= 3)
+            // Repetition impact (higher weight than before)
+            if (claimTracking.SimilarClaimsCount >= 10)
+            {
+                score += 3;
+                flags.Add("viral_spread");
+                analysis.Add($"Viral spread detected ({claimTracking.SimilarClaimsCount} similar posts)");
+            }
+            else if (claimTracking.SimilarClaimsCount >= 5)
+            {
+                score += 2;
+                flags.Add("repeated_high");
+                analysis.Add($"High repetition ({claimTracking.SimilarClaimsCount} similar posts)");
+            }
+            else if (claimTracking.SimilarClaimsCount >= 3)
             {
                 score += 1;
                 flags.Add("repeated");
-                analysis.Add($"High repetition ({claimTracking.SimilarClaimsCount} similar posts)");
+                analysis.Add($"Repeated claim ({claimTracking.SimilarClaimsCount} similar posts)");
             }
 
-            // Clamp score
+            // Final score adjustment and clamping
             score = Math.Clamp(score, 0, 10);
+
+            // Intelligent labeling based on actual risk
+            string label;
+            if (score >= 8) label = "CRITICAL";
+            else if (score >= 6) label = "HIGH RISK";
+            else if (score >= 4) label = "MEDIUM RISK";
+            else if (score >= 2) label = "LOW RISK";
+            else label = "SAFE";
 
             var result = new FakeNewsAnalysisResult
             {
                 Score = score,
-                Label = score >= 7 ? "CRITICAL" : score >= 4 ? "HIGH" : score >= 2 ? "MEDIUM" : "LOW",
-                Confidence = 60,
-                Category = "General",
-                Explanation = "Local analysis completed with claim tracking",
-                Suggestions = new[] { "Verify information from credible sources" },
+                Label = label,
+                Confidence = score > 0 ? 75 : 0, // Higher confidence for detected risks
+                Category = DetermineCategoryFromFlags(flags),
+                Explanation = string.Join("; ", analysis.Any() ? analysis : new[] { "Local keyword analysis completed" }) + 
+                            (claimTracking.IsRepeatedClaim ? $"; Claim has appeared {claimTracking.SimilarClaimsCount} times" : ""),
+                Suggestions = GenerateSuggestions(score, claimTracking.SimilarClaimsCount),
                 ClaimTracking = claimTracking,
-                RecommendedAction = score >= 7 ? "Do not share" : score >= 2 ? "Be cautious" : "Safe to share",
-                Mode = "FALLBACK",
+                RecommendedAction = GetRecommendedActionForScore(score),
+                Mode = "FALLBACK (Local Analysis)",
                 Flags = flags.ToArray()
             };
 
             // Cache the result
             _cache.Set(cacheKey, result, TimeSpan.FromHours(24));
             return Task.FromResult(result);
+        }
+
+        private string DetermineCategoryFromFlags(List<string> flags)
+        {
+            if (flags.Contains("critical_danger") || flags.Contains("all_caps_emphasis")) return "Safety Alert";
+            if (flags.Contains("viral_spread") || flags.Contains("repeated_high")) return "Misinformation Spread";
+            if (flags.Contains("uncertain") || flags.Contains("no_sources")) return "Unverified Claim";
+            return "General Alert";
+        }
+
+        private string[] GenerateSuggestions(int score, int repetitionCount)
+        {
+            var suggestions = new List<string>();
+
+            if (score >= 8)
+            {
+                suggestions.Add("⚠️ Avoid sharing immediately");
+                suggestions.Add("Verify with official sources");
+                if (repetitionCount >= 5) suggestions.Add("Report for potential misinformation");
+            }
+            else if (score >= 6)
+            {
+                suggestions.Add("Check credible news sources");
+                suggestions.Add("Verify before sharing");
+            }
+            else if (score >= 4)
+            {
+                suggestions.Add("Verify information from credible sources");
+            }
+            else if (score >= 2)
+            {
+                suggestions.Add("Be cautious before sharing");
+            }
+            else
+            {
+                suggestions.Add("Content appears safe to share");
+            }
+
+            return suggestions.ToArray();
+        }
+
+        private string GetRecommendedActionForScore(int score)
+        {
+            if (score >= 8) return "⛔ Critical: Do not share";
+            if (score >= 6) return "🔴 High Risk: Do not share";
+            if (score >= 4) return "🟠 Medium Risk: Verify before sharing";
+            if (score >= 2) return "🟡 Low Risk: Be cautious";
+            return "🟢 Safe to share";
         }
     }
 

@@ -27,14 +27,16 @@
         : Model.FakeNewsLabel;
 
     // Helper functions for advanced features
-    string GetRiskColorClass(string riskLevel) => riskLevel switch
+    string GetRiskColorClass(string riskLevel)
     {
-        "CRITICAL" => "text-red-600",
-        "HIGH" => "text-orange-600",
-        "MEDIUM" => "text-yellow-600",
-        "LOW" => "text-blue-600",
-        _ => "text-green-600"
-    };
+        if (string.IsNullOrWhiteSpace(riskLevel)) return "text-green-600";
+        var rl = riskLevel.ToUpperInvariant();
+        if (rl.Contains("CRITICAL")) return "text-red-600";
+        if (rl.Contains("HIGH")) return "text-orange-600";
+        if (rl.Contains("MEDIUM")) return "text-yellow-600";
+        if (rl.Contains("LOW")) return "text-blue-600";
+        return "text-green-600";
+    }
 
     string HighlightText(string text)
     {
@@ -70,6 +72,20 @@
         return builder.ToString();
     }
 
+    // IMPROVED #7: Recommended actions per risk level
+    string GetRecommendedAction(int score)
+    {
+        return score switch
+        {
+            >= 9 => "🚨 DO NOT SHARE - Requires immediate verification by official sources",
+            >= 7 => "⚠️ High risk - Verify with official sources before sharing",
+            >= 5 => "🟡 Medium risk - Check facts with reliable sources before sharing",
+            >= 3 => "🔵 Low risk - Cross-check with other sources if concerned",
+            >= 1 => "🟢 Content appears safe to share",
+            _ => "🟢 Content appears safe to share"
+        };
+    }
+
     string[] GetSuggestion(int score)
     {
         // Score mapping: 0-10 with new labels
@@ -96,23 +112,25 @@
         return new[] { "🟢 Content appears safe to share" };
     }
 
-    string GetRiskEmoji(string riskLevel) => riskLevel switch
+    string GetRiskEmoji(string riskLevel)
     {
-        "CRITICAL" => "🔴",
-        "HIGH" => "🟠",
-        "MEDIUM" => "🟡",
-        "LOW" => "🔵",
-        _ => "🟢"
-    };
+        if (string.IsNullOrWhiteSpace(riskLevel)) return "🟢";
+        var rl = riskLevel.ToUpperInvariant();
+        if (rl.Contains("CRITICAL")) return "🔴";
+        if (rl.Contains("HIGH")) return "🟠";
+        if (rl.Contains("MEDIUM")) return "🟡";
+        if (rl.Contains("LOW")) return "🔵";
+        return "🟢";
+    }
 
-    string GetConfidenceGradient(double confidence) => confidence switch
+    string GetConfidenceGradient(double confidence)
     {
-        var c when c >= 80 => "from-red-500 to-red-600",
-        var c when c >= 60 => "from-orange-500 to-red-500",
-        var c when c >= 40 => "from-yellow-500 to-orange-500",
-        var c when c >= 20 => "from-blue-500 to-yellow-500",
-        _ => "from-green-500 to-blue-500"
-    };
+        if (confidence >= 80) return "from-red-500 to-red-600";
+        if (confidence >= 60) return "from-orange-500 to-red-500";
+        if (confidence >= 40) return "from-yellow-500 to-orange-500";
+        if (confidence >= 20) return "from-blue-500 to-yellow-500";
+        return "from-green-500 to-blue-500";
+    }
 }
 
 <div id="post-@Model.Id" class="post post-card bg-white rounded-xl shadow-sm text-sm font-medium border1 max-w-[650px] mx-auto">
@@ -134,6 +152,11 @@
             </a>
 
             <div class="mt-1">
+                @if (Model.AppearedCount > 1)
+                {
+                    <span class="uppercase text-xs font-bold px-2 py-1 rounded-lg bg-blue-100 text-blue-700 mr-2">🔁 Repeated Post</span>
+                }
+                
                 @if (postLabel == "Needs Verification")
                 {
                     <span class="uppercase text-xs font-bold px-2 py-1 rounded-lg bg-red-100 text-red-700">Needs Verification</span>
@@ -206,12 +229,9 @@
     }
 
     @* Fallback mode indicator *@
-    @if (Model.FakeNewsMode == "FALLBACK")
-    {
-        <div class="bg-gray-50 border border-gray-200 text-gray-700 px-4 py-3 rounded-xl mb-3 font-semibold">
-            ⚙️ AI unavailable - using local analysis
-        </div>
-    }
+    <div class="bg-gray-50 border border-gray-200 text-gray-700 px-4 py-3 rounded-xl mb-3 font-semibold">
+        ⚙️ Analysis Mode: <strong>@(string.IsNullOrWhiteSpace(Model.FakeNewsMode) ? "FALLBACK" : Model.FakeNewsMode)</strong>
+    </div>
 
     @* Flags display *@
     @if (!string.IsNullOrEmpty(Model.FakeNewsFlags))
@@ -253,25 +273,96 @@
         <div class="flex flex-col gap-3 text-xs text-gray-700">
             <div class="flex flex-col gap-2">
                 <div class="flex justify-between items-center">
-                    <span class="font-semibold">Risk Score:</span>
+                    <span class="font-semibold">Risk Level:</span>
                     <div class="flex items-center gap-2">
-                        <span class="text-sm font-bold">@Model.FakeNewsScore</span>
-                        <span class="text-xs text-gray-500">→</span>
                         <span class="text-sm font-bold @GetRiskColorClass(Model.RiskLevel)">@GetRiskEmoji(Model.RiskLevel) @Model.RiskLevel</span>
                     </div>
                 </div>
                 <div class="flex justify-between items-center">
                     <span class="font-semibold">Confidence:</span>
-                    <span class="text-sm font-bold text-blue-600">@Math.Round(Model.ConfidenceLevel, 0)%</span>
+                    @if (Model.ConfidenceLevel > 0)
+                    {
+                        <span class="text-sm font-bold text-blue-600">@Math.Round(Model.ConfidenceLevel, 0)%</span>
+                    }
+                    else
+                    {
+                        <span class="text-sm font-bold text-gray-500 italic">N/A (Local Analysis)</span>
+                    }
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-gradient-to-r @GetConfidenceGradient(Model.ConfidenceLevel) h-2 rounded-full transition-all duration-300"
-                         style="width: @Math.Max(0, Math.Min(100, Model.ConfidenceLevel))%"></div>
-                </div>
+                @if (Model.ConfidenceLevel > 0)
+                {
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-gradient-to-r @GetConfidenceGradient(Model.ConfidenceLevel) h-2 rounded-full transition-all duration-300"
+                             style="width: @Math.Max(0, Math.Min(100, Model.ConfidenceLevel))%"></div>
+                    </div>
+
+                    @if (Model.ConfidenceLevel < 50)
+                    {
+                        <div class="text-xs text-gray-600 italic mt-1">Low confidence analysis</div>
+                    }
+                }
                 <div class="text-center text-xs text-gray-500">@postLabel</div>
             </div>
 
-            <!-- 📡 Claim Tracking -->
+            <!-- � Detection Signals Section - NEW IMPROVEMENT #3 -->
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 mt-3">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-lg">📊</span>
+                    <span class="font-semibold text-blue-900">Detection Signals</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    @* Urgency Signal *@
+                    @if (Model.FakeNewsReasons?.Any(r => r.Contains("Urgent")) ?? false)
+                    {
+                        <span class="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                            <span>⏱️</span> Urgency
+                        </span>
+                    }
+                    
+                    @* Repetition Signal *@
+                    @if ((Model.AppearedCount ?? 1) > 1)
+                    {
+                        <span class="bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                            <span>🔁</span> Repeated
+                        </span>
+                    }
+                    
+                    @* Contradiction Signal *@
+                    @if (Model.FakeNewsReasons?.Any(r => r.Contains("Contradiction")) ?? false)
+                    {
+                        <span class="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                            <span>⚖️</span> Contradictions
+                        </span>
+                    }
+                    
+                    @* Exaggeration Signal *@
+                    @if (Model.FakeNewsReasons?.Any(r => r.Contains("Exaggeration")) ?? false)
+                    {
+                        <span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                            <span>📢</span> Exaggeration
+                        </span>
+                    }
+                    
+                    @* Viral Spread Signal *@
+                    @if ((Model.AppearedCount ?? 0) >= 5)
+                    {
+                        <span class="bg-pink-100 text-pink-700 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                            <span>📈</span> Viral Spread
+                        </span>
+                    }
+
+                    @if (!((Model.FakeNewsReasons?.Any(r => r.Contains("Urgent")) ?? false) || 
+                           (Model.AppearedCount ?? 1) > 1 || 
+                           (Model.FakeNewsReasons?.Any(r => r.Contains("Contradiction")) ?? false) || 
+                           (Model.FakeNewsReasons?.Any(r => r.Contains("Exaggeration")) ?? false) || 
+                           (Model.AppearedCount ?? 0) >= 5))
+                    {
+                        <span class="text-xs text-gray-500 italic">No unusual signals detected</span>
+                    }
+                </div>
+            </div>
+
+            <!-- �📡 Claim Tracking -->
             @if (Model.IsRepeatedClaim || Model.AppearedCount > 1)
             {
                 <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-2">
@@ -366,14 +457,24 @@
             }
 
             <div class="mt-3 text-xs text-gray-700">
-                <strong>Recommended Action:</strong>
-                <ul class="list-disc list-inside ml-4 mt-2">
-                    @foreach (var item in GetSuggestion(Model.FakeNewsScore))
-                    {
-                        <li>@item</li>
-                    }
-                </ul>
+                <strong>📋 Recommended Action:</strong>
+                <div class="mt-2 p-2 bg-blue-50 border-l-4 border-blue-500 rounded">
+                    <p class="text-blue-900">@GetRecommendedAction(Model.FakeNewsScore)</p>
+                </div>
             </div>
+            
+            @if (Model.FakeNewsReasons != null && Model.FakeNewsReasons.Any())
+            {
+                <div class="mt-3 text-xs text-gray-700">
+                    <strong>🔍 Reason for Rating:</strong>
+                    <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
+                        @foreach (var reason in Model.FakeNewsReasons.Take(3))
+                        {
+                            <li>@reason</li>
+                        }
+                    </ul>
+                </div>
+            }
         </div>
     </div>
 

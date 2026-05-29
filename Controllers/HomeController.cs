@@ -112,6 +112,7 @@ namespace DeerBalak.Controllers
                 FakeNewsRecommendedAction = analysisResult.RecommendedAction,
                 FakeNewsMode = analysisResult.Mode,
                 FakeNewsFlags = analysisResult.Flags != null ? string.Join(",", analysisResult.Flags) : null,
+                // ConfidenceLevel and RiskLevel are now computed from FakeNewsScore automatically
                 // Set claim tracking with initial values
                 AppearedCount = 1,
                 UniqueUsersCount = 1,
